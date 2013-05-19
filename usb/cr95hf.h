@@ -26,7 +26,7 @@ Copyright Samuel Foley 2013
 
 #define CR95HF_OK	0x80
 #define CR95HF_USB_OK 0x7
-
+//
 typedef unsigned char byte;
 int cr95hf_init(libusb_device *dev);
 int cr95hf_send_eof();

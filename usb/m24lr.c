@@ -87,7 +87,7 @@ int m24lr_read_block(unsigned char address, unsigned int *block)
 	for(i = 4; i<8; i++)
 	{
 		*block = (*block<<8) + response[i];
-		printf("%c", response[i], *block);
+		//printf("%c", response[i], *block);
 	}
 	return 0;
 }
@@ -136,6 +136,37 @@ int m24lr_read_sector(unsigned char sector, unsigned char *blocks)
 	}
 	printf("\n");
 	return 0;
+}
+
+int m24lr_read_config(unsigned char *config)
+{
+	int r;
+	
+	request[0] = M24LR_FLAGS;
+	request[1] = M24LR_READ_CFG;
+	request[2] = M24LR_IC_MFG;
+	
+	r = cr95hf_sendrecv(request, 3, response, CR95HF_BUFFER_SIZE); 
+	
+	r = m24lr_error(response);
+	if(r) return r; 
+	
+	*config = response[4];
+	return 0;
+}
+
+int m24lr_write_docfg(unsigned char data)
+{
+	int r;
+	
+	request[0] = M24LR_FLAGS;
+	request[1] = M24LR_WRITE_DOCFG;
+	request[2] = M24LR_IC_MFG;
+	request[3] = data;
+	
+	r = cr95hf_sendrecv(request, 4, response, CR95HF_BUFFER_SIZE); 
+	
+	return m24lr_error(response);	
 }
 
 int m24lr_error(unsigned char *response)

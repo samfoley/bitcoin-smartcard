@@ -1,14 +1,19 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <libusb.h>
 
 #include "m24lr.h"
 #include "cr95hf.h"
+#include "base58.h"
 
+#define BITCOIN_TRANSACTION_READY 1
 
+const char bitcoin_address[] = "mwwdpwLoVr7BsCRyPqwyCCPGS93JenAZRS";
+int bitcoin_satoshis = 100000000;
 
 int main(void)
 {
@@ -79,39 +84,44 @@ int main(void)
 				printf("%02x", info.UID[i]);
 			printf("\n");
 		}
-		r = m24lr_write_block(3, 0x66677071);
-		if(r)
+		
+		m24lr_write_block(2, bitcoin_satoshis);
+		unsigned char binary_address[25];
+		if(!_blkmk_b58tobin(binary_address, 25, bitcoin_address, 0))
 		{
-			fprintf(stderr, "write block error %x\n", r);
+			fprintf(stderr,"Invalid Bitcoin address\n");
+			exit(-1);
 		}
+		unsigned int block=0;
 		
-		unsigned int block;
-		printf("\nRead block: \n");
-		r = m24lr_read_block(0, &block);
-		r = m24lr_read_block(1, &block);
-		r = m24lr_read_block(2, &block);
-		r = m24lr_read_block(3, &block);
-		r = m24lr_read_block(4, &block);
-		r = m24lr_read_block(5, &block);
-		r = m24lr_read_block(6, &block);
-		r = m24lr_read_block(7, &block);
-		r = m24lr_read_block(8, &block);
-		r = m24lr_read_block(9, &block);
-		r = m24lr_read_block(10, &block);
-		r = m24lr_read_block(11, &block);
-		r = m24lr_read_block(12, &block);
-		r = m24lr_read_block(13, &block);
-		r = m24lr_read_block(14, &block);
-		r = m24lr_read_block(15, &block);
-		r = m24lr_read_block(16, &block);
-		printf("\nRead multiple blocks:\n");
-		unsigned char sector[32];
-		r = m24lr_read_sector(0, sector);		
-		if(r)
-			fprintf(stderr, "sector error %d\n", r);
-			
-		
-		
+		printf("Writing address\n");
+		for(i=0;i<25; i++)
+		{
+			printf("%02x", binary_address[i]);
+			block = (block<<8) + binary_address[i];
+			if(i%4==3)
+			{
+				m24lr_write_block(3+i/4, block);
+				block = 0;
+			}
+		}
+		i--;
+		if(i%4!=3)
+		{
+			block <<= 8*(3-i%4);
+			m24lr_write_block(3+i/4, block);
+		}
+		printf("\nReading address\n");
+		for(i=0; i<7; i++)
+		{
+			if(m24lr_read_block(3+i, &block))
+			{
+				printf("____");
+			} else {
+				printf("%04x", block);
+			}
+		}
+		printf("\n");
 	}
 	
 	libusb_free_device_list(devs, 1);
