@@ -1,5 +1,8 @@
-all: usb
+all: usb test
 
+test:	test.c
+	gcc -o test test.c -lssl
+	
 usb: usb.c cr95hf.h cr95hf.o m24lr.o base58.o
 	gcc -o usb usb.c cr95hf.o m24lr.o base58.o -I /usr/local/lib/libusb-1.0.9/libusb/ -l usb-1.0
 

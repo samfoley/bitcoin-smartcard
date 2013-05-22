@@ -10,7 +10,10 @@
 #include "cr95hf.h"
 #include "base58.h"
 
-#define BITCOIN_TRANSACTION_READY 1
+#define BITCOIN_TRANSACTION_READY 0x01
+#define BITCOIN_UNSPENT_READY 0x02
+#define BITCOIN_PENDING 0x20
+#define BITCOIN_COMPLETE 0x30
 
 const char bitcoin_address[] = "mwwdpwLoVr7BsCRyPqwyCCPGS93JenAZRS";
 int bitcoin_satoshis = 100000000;
