@@ -4,14 +4,21 @@
 #include <openssl/pem.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "base58.h"
+#include "bignum8.h"
+
+uint8_t bn8_buffer_1[BN8_SIZE] = { 0 };
+uint8_t bn8_buffer_2[BN8_SIZE] = { 0 };
+uint8_t bn8_buffer_3[BN8_SIZE] = { 0 };
+uint8_t bn8_buffer_4[BN8_SIZE] = { 0 };
 
 const char priv_key_b58[] = "cSoZxDuKeR2TWRyQp8ZXAgPogL281Y786ZogzfmK13c1RBNRcmYS";
 
 typedef struct
 {
-	BIGNUM *x;
+	BIGNUM *x; 
 	BIGNUM *y;
 	bool at_infinity;
 } Point;
@@ -79,6 +86,13 @@ int main()
 		fprintf(stderr,"BN_CTX fail\n");
         return -1;
 	}	
+	
+	// test bn8_lshift
+	bn8_buffer_1[BN8_SIZE-1] = 0xff;
+	bn8_lshift(bn8_buffer_1, 9);
+	printf("lshift ");
+	bn8_print(bn8_buffer_1);
+	printf("\n\n");
 	
 	// Point add/double tests
 	
@@ -223,6 +237,7 @@ ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char 
 	
 	BIGNUM *tmp = BN_new();
 	BIGNUM *tmp2 = BN_new();
+	BIGNUM *tmp3 = BN_new();
 	
 	BN_hex2bn(&p, p_hex);
 	BN_hex2bn(&b, b_hex);
@@ -260,13 +275,15 @@ ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char 
 	
 	
 	// 5. r = x1 (mod n)
-	BN_mod(r, curve_point->x, mod, ctx);
+	BN_nnmod(r, curve_point->x, mod, ctx);
 	
 	// 6. s = k^-1(z + rdA) (mod n)
 	BN_mod_mul(tmp, r, dA, mod, ctx);
-	BN_mod_add(tmp2, z, tmp, mod, ctx);
+	
+	bn8_mod_add(tmp2, z, tmp, mod, ctx);
+	
 	BN_mod_inverse(tmp, k, mod, ctx);
-	BN_mod_mul(s, tmp, tmp2, mod, ctx);
+	bn8_mod_mul(s, tmp, tmp2, mod, ctx);
 	
 	printf("r: ");
 	BN_print_fp(stdout, r);
@@ -331,19 +348,24 @@ Point* point_add(Point *P, Point *Q, Curve *c)
 	if(Q->at_infinity) return P;
 	
 	// lambda = (yq-yp)/(xq-xp)
-	if (!BN_mod_sub(tmp, Q->y, P->y, c->p, ctx)) goto err; // yq-yp
-	if (!BN_mod_sub(tmp2, Q->x, P->x, c->p, ctx)) goto err; // xq-xp
+	//if (!BN_mod_sub(tmp, Q->y, P->y, c->p, ctx)) goto err; // yq-yp
+	bn8_mod_sub(tmp, Q->y, P->y, c->p, ctx);
+	//if (!BN_mod_sub(tmp2, Q->x, P->x, c->p, ctx)) goto err; // xq-xp
+	bn8_mod_sub(tmp2, Q->x, P->x, c->p, ctx);
 	if (!BN_mod_inverse(tmp3, tmp2, c->p, ctx)) goto err; // (xq-xp)^-1
 	if (!BN_mod_mul(lambda, tmp, tmp3, c->p, ctx)) goto err; // (yq-yp)/(xq-xp)
 	
 	
 	// xr = lambda^2 - xp - xq
 	if (!BN_mod_sqr(tmp, lambda, c->p, ctx)) goto err; // lambda^2
-	if (!BN_mod_sub(tmp2, tmp, P->x, c->p, ctx)) goto err; // lambda^2 - xp
-	if (!BN_mod_sub(xr, tmp2, Q->x, c->p, ctx)) goto err; // lambda^2 - xp - xq
+	//if (!BN_mod_sub(tmp2, tmp, P->x, c->p, ctx)) goto err; // lambda^2 - xp
+	bn8_mod_sub(tmp2, tmp, P->x, c->p, ctx);
+	//if (!BN_mod_sub(xr, tmp2, Q->x, c->p, ctx)) goto err; // lambda^2 - xp - xq
+	bn8_mod_sub(xr, tmp2, Q->x, c->p, ctx);
 	
 	// yr = lambda(xp - xr) - yp
-	if (!BN_mod_sub(tmp, P->x, xr, c->p, ctx)) goto err; // xp - xr
+	//if (!BN_mod_sub(tmp, P->x, xr, c->p, ctx)) goto err; // xp - xr
+	bn8_mod_sub(tmp, P->x, xr, c->p, ctx);
 	if (!BN_mod_mul(tmp2, lambda, tmp, c->p, ctx)) goto err; // lambda(xp-xr)
 	if (!BN_mod_sub(yr, tmp2, P->y, c->p, ctx)) goto err; // lambda(xp-xr) - yp
 		

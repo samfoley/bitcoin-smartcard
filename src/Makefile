@@ -1,7 +1,7 @@
 all: usb test
 
-test:	test.c base58.h base58.o
-	gcc -o test test.c base58.o -lssl -g
+test:	test.c base58.h base58.o bignum8.o
+	gcc -o test test.c base58.o bignum8.o -lssl -g
 	
 usb: usb.c cr95hf.h cr95hf.o m24lr.o base58.o
 	gcc -o usb usb.c cr95hf.o m24lr.o base58.o -I /usr/local/lib/libusb-1.0.9/libusb/ -l usb-1.0
@@ -14,4 +14,10 @@ m24lr.o:	m24lr.c m24lr.h cr95hf.h
 
 base58.o:	base58.h base58.c
 	gcc -c base58.c
+
+bignum8.o:	bignum8.c bignum8.h
+	gcc -c bignum8.c -g
+	
+clean:
+	rm *.o
 	
