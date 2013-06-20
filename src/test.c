@@ -13,6 +13,7 @@ uint8_t bn8_buffer_1[BN8_SIZE] = { 0 };
 uint8_t bn8_buffer_2[BN8_SIZE] = { 0 };
 uint8_t bn8_buffer_3[BN8_SIZE] = { 0 };
 uint8_t bn8_buffer_4[BN8_SIZE] = { 0 };
+uint8_t bn8_buffer_r[BN8_SIZE*2] = { 0 };
 
 const char priv_key_b58[] = "cSoZxDuKeR2TWRyQp8ZXAgPogL281Y786ZogzfmK13c1RBNRcmYS";
 
@@ -89,9 +90,24 @@ int main()
 	
 	// test bn8_lshift
 	bn8_buffer_1[BN8_SIZE-1] = 0xff;
+	bn8_buffer_1[BN8_SIZE-1] = 0xba;
 	bn8_lshift(bn8_buffer_1, 9);
 	printf("lshift ");
 	bn8_print(bn8_buffer_1);
+	printf("\n\n");
+	bn8_buffer_1[BN8_SIZE-1] = 0x00;
+	
+	// test bn8_add_shift
+	printf("addshift\n\n");
+	bn8_buffer_1[BN8_SIZE-1] = 1;
+	bn8_buffer_1[BN8_SIZE-2] = 0xab;
+	bn8_buffer_1[BN8_SIZE-3] = 0xff;
+	bn8_add_shift(bn8_buffer_r, bn8_buffer_1, 4);
+	bn8_add_shift(bn8_buffer_r, bn8_buffer_1, 32);
+	
+	bn8_buffer_2[BN8_SIZE-1] = 0xff;
+	bn8_add_shift(bn8_buffer_r, bn8_buffer_2, 0);
+	bn8_print(bn8_buffer_r); bn8_print(bn8_buffer_r+BN8_SIZE);
 	printf("\n\n");
 	
 	// Point add/double tests
@@ -353,11 +369,13 @@ Point* point_add(Point *P, Point *Q, Curve *c)
 	//if (!BN_mod_sub(tmp2, Q->x, P->x, c->p, ctx)) goto err; // xq-xp
 	bn8_mod_sub(tmp2, Q->x, P->x, c->p, ctx);
 	if (!BN_mod_inverse(tmp3, tmp2, c->p, ctx)) goto err; // (xq-xp)^-1
-	if (!BN_mod_mul(lambda, tmp, tmp3, c->p, ctx)) goto err; // (yq-yp)/(xq-xp)
+	bn8_mod_mul(lambda, tmp, tmp3, c->p, ctx);
+	//if (!BN_mod_mul(lambda, tmp, tmp3, c->p, ctx)) goto err; // (yq-yp)/(xq-xp)
 	
 	
 	// xr = lambda^2 - xp - xq
-	if (!BN_mod_sqr(tmp, lambda, c->p, ctx)) goto err; // lambda^2
+	//if (!BN_mod_sqr(tmp, lambda, c->p, ctx)) goto err; // lambda^2
+	bn8_mod_mul(tmp, lambda, lambda, c->p, ctx);
 	//if (!BN_mod_sub(tmp2, tmp, P->x, c->p, ctx)) goto err; // lambda^2 - xp
 	bn8_mod_sub(tmp2, tmp, P->x, c->p, ctx);
 	//if (!BN_mod_sub(xr, tmp2, Q->x, c->p, ctx)) goto err; // lambda^2 - xp - xq
