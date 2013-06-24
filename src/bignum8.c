@@ -8,10 +8,17 @@ uint8_t t1[BN8_SIZE] = { 0 };
 uint8_t t2[BN8_SIZE] = { 0 };
 uint8_t t3[BN8_SIZE] = { 0 };
 uint8_t t4[BN8_SIZE] = { 0 };
-uint8_t tr[BN8_SIZE*2] = { 0 };
+uint8_t tr[BN8_SIZE+2] = { 0 };
 uint8_t tmul[BN8_SIZE*2] = { 0 };
 
-uint8_t MOD_P[BN8_SIZE] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE,0xFF,0xFF,0xFC,0x2F};
+uint8_t MOD_0000P[BN8_SIZE+4] = {0x00, 0x00, 0x00, 0x00, 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE,0xFF,0xFF,0xFC,0x2F};
+
+uint8_t MOD_0000N[BN8_SIZE+4] = {0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41};
+
+uint8_t U0_P[10] = {0x01, 0x00, 0x00, 0x03, 0xd1};
+uint8_t U0_N[17] = {0x01, 0x45, 0x51, 0x23, 0x19, 0x50, 0xb7, 0x5f, 0xc4, 0x40, 0x2d, 0xa1, 0x73, 0x2f, 0xc9, 0xbe, 0xc0};
+
+#define MOD_P (MOD_0000P+4)
 
 void bn8_to_bn(BIGNUM *r, bn8 a)
 {
@@ -97,7 +104,7 @@ void bn8_mod_sub(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
 	BN_free(tmp);
 }
 
-void bn8_mod_mul(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
+void bn8_mod_mulP(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
          BN_CTX *ctx)
 {
 	uint8_t i;
@@ -106,19 +113,19 @@ void bn8_mod_mul(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
 	
 	bn8_from_bn(t1, a);
 	bn8_from_bn(t2, b);
-	bn8_mul(tmul, t1, t2, 32);
+	bn8_mul(tmul, t1, t2, BN8_SIZE, BN8_SIZE);
 
-	bn8_fast_reduction(tr, tmul);
+	bn8_barrett_reduction_p(tr, tmul);
 	
-	BN_bin2bn(tr, 64, tmp);
+	BN_bin2bn(tr, 34, tmp);
 	BN_bin2bn(tmul, 64, tmp2);
 	
 	//BN_mod_mul(ret, a, b, m, ctx);
 	//BN_mul(tmp2, a, b, ctx);
-	BN_nnmod(ret, tmp2, m, ctx);
+	BN_nnmod(ret, tmp2, m, ctx);	
 	
 	if(BN_cmp(ret,tmp)) {
-		printf("\n\nmul error \n");
+		printf("\n\nmul mod p error \n");
 		bn8_print(t1); printf(" * \n");
 		bn8_print(t2); printf("\n");
 		BN_print_fp(stdout, a);printf(" * \n");
@@ -130,6 +137,42 @@ void bn8_mod_mul(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
 	
 	BN_free(tmp);
 }
+
+void bn8_mod_mulN(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
+         BN_CTX *ctx)
+{
+	uint8_t i;
+	BIGNUM *tmp = BN_new();
+	BIGNUM *tmp2 = BN_new();	
+	
+	bn8_from_bn(t1, a);
+	bn8_from_bn(t2, b);
+	bn8_mul(tmul, t1, t2, BN8_SIZE, BN8_SIZE);
+
+	bn8_barrett_reduction_n(tr, tmul);
+	
+	BN_bin2bn(tr, 34, tmp);
+	BN_bin2bn(tmul, 64, tmp2);
+	
+	//BN_mod_mul(ret, a, b, m, ctx);
+	//BN_mul(tmp2, a, b, ctx);
+	BN_nnmod(ret, tmp2, m, ctx);
+	BN_nnmod(tmp2, tmp, m, ctx);
+	
+	if(BN_cmp(ret,tmp2)) {
+		printf("\n\nmul mod n error \n");
+		bn8_print(t1); printf(" * \n");
+		bn8_print(t2); printf("\n");
+		BN_print_fp(stdout, a);printf(" * \n");
+		BN_print_fp(stdout, b);printf("\ntmul=");
+		bn8_print(tmul); bn8_print(tmul+BN8_SIZE); printf("\n\nbn8=");
+		BN_print_fp(stdout, tmp2);printf("\nBN= ");
+		BN_print_fp(stdout, ret);printf("\n\n");
+	}
+	
+	BN_free(tmp);
+}
+
 /*
 void bn8_nnmod(BIGNUM *r, const BIGNUM *a, const BIGNUM *m, BN_CTX *ctx)
 {
@@ -158,6 +201,33 @@ void bn8_nnmod(BIGNUM *r, const BIGNUM *a, const BIGNUM *m, BN_CTX *ctx)
 	}	
 	BN_free(tmp);
 }*/
+
+void bn8_mod_inverse(BIGNUM *ret, BIGNUM *a, BIGNUM *mod, BN_CTX *ctx)
+{
+	uint8_t i;
+	BIGNUM *tmp = BN_new();
+	BIGNUM *tmp2 = BN_new();	
+	
+	bn8_from_bn(t1, a);
+	bn8_from_bn(t2, mod);
+	bn8_invert(t3, t1, t2);
+	
+	bn8_to_bn(tmp, t3);		
+	
+	BN_mod_inverse(tmp2, a, mod, ctx);
+	BN_nnmod(ret, tmp, mod, ctx);
+	
+	if(BN_cmp(ret,tmp2)) {
+		printf("\n\ninverse error \n");
+		bn8_print(t1); printf(" - \n");
+		bn8_print(t2); printf("\n");
+		BN_print_fp(stdout, a);printf("\nt3=");
+		bn8_print(t3); printf("\nbn8=");
+		BN_print_fp(stdout, ret);printf("\nBN= ");
+		BN_print_fp(stdout, tmp2);printf("\n");
+	}	
+	BN_free(tmp);
+}
 
 void bn8_add(bn8 r, const bn8 a, const bn8 b)
 {
@@ -223,6 +293,28 @@ void bn8_add_word(bn8 r, uint8_t a)
 	//r[i] = carry;
 }
 
+// r = r+a
+// where r is n bytes 
+//       a is n-1 bytes
+void bn8_add_n(bn8 r, bn8 a, uint8_t n)
+{
+	int i;
+	uint8_t carry;
+	uint16_t sum;
+	
+	sum = r[n-1]+a[n-2];
+	carry = (sum&0xff00) ? 1:0;
+	r[n-1] = sum&0xff;
+	
+	for(i=n-2; i>0; i--)
+	{
+		sum = r[i]+a[i-1]+carry;
+		carry = (sum&0xff00) ? 1:0;
+		r[i] = sum&0xff;
+	}
+	r[0] = r[0]+carry;
+}
+
 void bn8_sub(bn8 r, const bn8 a, const bn8 b)
 {
 	int i;
@@ -242,6 +334,26 @@ void bn8_sub(bn8 r, const bn8 a, const bn8 b)
 	if(carry) bn8_addc(r, MOD_P);
 }
 
+void bn8_sub_acc(bn8 r, const bn8 a, uint8_t size)
+{
+	int i;
+	uint8_t carry, carry1;
+	uint16_t sum;
+	
+	sum = r[size-1]-a[size-1];
+	carry = (sum&0xff00) ? 1:0;
+	r[size-1] = sum&0xff;
+	
+	for(i=size-2; i>=0; i--)
+	{
+		sum = r[i]-a[i]-carry;
+		carry1 = carry;
+		carry = (sum&0xff00) ? 1:0;
+		r[i] = sum&0xff;
+	}	
+	if(carry ^ carry1) printf("overflow\n");
+}
+
 void bn8_subc(bn8 r, uint8_t c, const bn8 a)
 {
 	int i;
@@ -258,6 +370,29 @@ void bn8_subc(bn8 r, uint8_t c, const bn8 a)
 		carry = (sum&0xff00) ? 1:0;
 		r[i] = sum&0xff;
 	}	
+}
+
+// r = r-a
+// where r is n bytes
+//       a is n-1 bytes
+// (assumes: result always positive)
+void bn8_sub_n(bn8 r, bn8 a, uint8_t n)
+{
+	int i;
+	uint8_t carry;
+	uint16_t sum;	
+	
+	sum = r[n-1]-a[n-2];
+	carry = (sum&0xff00) ? 1:0;
+	r[n-1] = sum&0xff;
+	
+	for(i=n-2; i>0; i--)
+	{
+		sum = r[i]-a[i-1]-carry;
+		carry = (sum&0xff00) ? 1:0;
+		r[i] = sum&0xff;
+	}	
+	r[0] = r[0] - carry;	
 }
 
 void bn8_sub64(bn8 r, bn8 a)
@@ -295,6 +430,15 @@ void bn8_print(const bn8 a)
 	}
 }
 
+void bn8_printn(const bn8 a, uint8_t n)
+{
+	uint8_t i;
+	
+	for(i=0; i<n; i++)
+	{
+		printf("%02x", a[i]);
+	}
+}
 void bn8_zero(bn8 r, uint8_t size)
 {
 	while(size)
@@ -322,8 +466,10 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	bn8 c1 = c;
 	bn8 c0 = c + BN8_SIZE;
 	
-	bn8_zero(a, BN8_SIZE*2);		
+	while(bn8_cmp(c1, MOD_P) > 0)
+		bn8_subc(c1, 0, MOD_P);	
 		
+	bn8_zero(a, BN8_SIZE*2);				
 	bn8_add_shift(a, c1, 32);	
 	bn8_add_shift(a, c1, 9);
 	bn8_add_shift(a, c1, 8);
@@ -344,10 +490,12 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	BN_bin2bn(MOD_P, 32, pBN);
 	
 	BN_zero(rBN);
-	BN_add(rBN, rBN, a1BN);
+	//BN_add(rBN, rBN, a1BN);
 	BN_add(rBN, rBN, a0BN);
 	BN_add(rBN, rBN, c0BN);
-	
+	BN_lshift(axBN, a1BN, 256);
+	BN_add(rBN, rBN, axBN);
+	/*
 	BN_lshift(axBN, a1BN, 32);
 	BN_add(rBN, rBN, axBN);
 	BN_lshift(axBN, a1BN, 9);
@@ -360,7 +508,7 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	BN_add(rBN, rBN, axBN);
 	BN_lshift(axBN, a1BN, 4);
 	BN_add(rBN, rBN, axBN);
-	
+	*/
 	bn8_zero(r, BN8_SIZE*2);
 	bn8_add_shift(r, a1, 32);
 	bn8_add_shift(r, a1, 9);
@@ -380,11 +528,12 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	BN_print_fp(stdout, rBN);
 	printf("\n\n");
 	
-	while(BN_cmp(rBN, pBN) > 0)
+	/*while(BN_cmp(rBN, pBN) > 0)
 	{
 		BN_sub(tmpBN, rBN, pBN);
 		BN_copy(rBN, tmpBN);
-	}
+	}*/
+	
 	
 	bn8_zero(r, BN8_SIZE*2);
 	bn8_from_bn(r+BN8_SIZE, rBN);
@@ -393,6 +542,68 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	while(bn8_cmp64(r, MOD_P) > 0)
 		bn8_sub64(r, MOD_P);	
 	
+}
+
+void bn8_barrett_reduction_p(bn8 r, bn8 z)
+{
+	uint8_t i;
+	uint8_t q_[BN8_SIZE+1] = {0}; // 33 byte
+	uint8_t q_p[BN8_SIZE*2+1] = {0};
+	bn8_zero(r, BN8_SIZE+2);
+	
+	bn8_mul(q_p, z, U0_P, BN8_SIZE+1, 5);
+	
+	
+	for(i=0; i<5; i++)
+		q_[BN8_SIZE-i] = q_p[4-i];
+	bn8_add_n(q_, z, BN8_SIZE+1);	
+	
+	
+	bn8_mul(q_p, q_, MOD_P, BN8_SIZE+1, BN8_SIZE); // todo: efficient 33 byte multiplication
+	
+	if(bn8_cmp_n(z+BN8_SIZE-1, q_p+BN8_SIZE, BN8_SIZE+1) < 0)	
+		r[0] = 1;	// Adds b^(k+1) if r would be negative
+	
+	for(i=0; i<BN8_SIZE+1; i++)	
+		r[1+i] = z[31+i];
+		
+	bn8_sub_n(r, q_p+BN8_SIZE, BN8_SIZE+2);
+	
+	while(bn8_cmp_n(r, MOD_0000P+2, BN8_SIZE+2) > 0)
+	{
+		bn8_sub_n(r, MOD_0000P+3, BN8_SIZE+2);
+	}
+}
+
+void bn8_barrett_reduction_n(bn8 r, bn8 z)
+{
+	uint8_t i;
+	uint8_t q_[BN8_SIZE+1] = {0}; // 33 byte
+	uint8_t q_p[BN8_SIZE*2+1] = {0};
+	bn8_zero(r, BN8_SIZE+2);
+	
+	bn8_mul(q_p, z, U0_N, BN8_SIZE+1, 17);
+	
+	
+	for(i=0; i<17; i++)
+		q_[BN8_SIZE-i] = q_p[16-i];
+	bn8_add_n(q_, z, BN8_SIZE+1);	
+	
+	
+	bn8_mul(q_p, q_, MOD_0000N+4, BN8_SIZE+1, BN8_SIZE); // todo: efficient 33 byte multiplication
+	
+	if(bn8_cmp_n(z+BN8_SIZE-1, q_p+BN8_SIZE, BN8_SIZE+1) < 0)	
+		r[0] = 1;	// Adds b^(k+1) if r would be negative
+	
+	for(i=0; i<BN8_SIZE+1; i++)	
+		r[1+i] = z[31+i];
+		
+	bn8_sub_n(r, q_p+BN8_SIZE, BN8_SIZE+2);
+	
+	while(bn8_cmp_n(r, MOD_0000N+2, BN8_SIZE+2) > 0)
+	{
+		bn8_sub_n(r, MOD_0000N+3, BN8_SIZE+2);
+	}
 }
 
 // r += a << n
@@ -457,20 +668,49 @@ void bn8_lshift(bn8 r, uint8_t n)
 	}
 }
 
-void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t size)
+void bn8_rshift1(bn8 r, uint8_t size)
+{
+	uint8_t i;
+	uint8_t carry;		
+		
+	for(i=size; i>1; i--)
+	{
+		carry = r[i-2]<<7;
+		r[i-1] = r[i-1]>>1 | carry;
+	}
+	r[0] = r[0]>>1;
+}
+
+void bn8_rshift1_2s(bn8 r, uint8_t size)
+{
+	uint8_t i;
+	uint8_t carry;		
+		
+	for(i=size; i>1; i--)
+	{
+		carry = r[i-2]<<7;
+		r[i-1] = r[i-1]>>1 | carry;
+	}
+	if(r[0]&0x80)
+		r[0] = (r[0]>>1) | 0x80;
+	else
+		r[0] = r[0]>>1;
+}	
+
+void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t sizex, uint8_t sizey)
 {
 	int i,j;	
 	uint16_t uv=0;
 	
 	
-	for(i=0; i<2*size; i++)
+	for(i=0; i<sizex+sizey; i++)
 		r[i]=0;
 		
-	for(i=size-1; i>=0; i--)
+	for(i=sizex-1; i>=0; i--)
 	{
 		uv &= 0xff;
 		
-		for(j=size-1; j>=0; j--)
+		for(j=sizey-1; j>=0; j--)
 		{
 			uv = r[i+j+1]+x[i]*y[j] + ((uv>>8) & 0xff);
 			r[i+j+1]=uv&0xff;
@@ -508,6 +748,101 @@ void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t size)
 		bn8_add(r, t5, x0y0);
 	}
 }*/
+uint8_t bn8_is_even_2s(bn8 a, uint8_t size)
+{
+	if(a[0] & 0x80) return (a[size-1] & 0x01);
+	return !(a[size-1] & 0x01);
+}
+
+uint8_t bn8_is_even(bn8 a, uint8_t size)
+{
+	return !(a[size-1] & 0x01);
+}
+
+uint8_t bn8_is_one(bn8 a, uint8_t size)
+{
+	uint8_t i = 0;
+	
+	for(i=0; i<size-1; i++)
+	{
+		if(a[i]) return 0;
+	}
+	return a[size-1]==1;
+}
+
+void bn8_copy(bn8 r, bn8 a, uint8_t size)
+{
+	uint8_t i;
+	
+	for(i=0; i<size; i++)
+		r[i] = a[i];
+}
+
+void bn8_invert(bn8 r, bn8 a, bn8 p)
+{
+	uint8_t u[BN8_SIZE];
+	uint8_t v[BN8_SIZE];
+	uint8_t x1[BN8_SIZE*2] = {0};
+	uint8_t x2[BN8_SIZE*2] = {0};
+	
+	bn8_copy(u, a, BN8_SIZE);
+	bn8_copy(v, p, BN8_SIZE);
+	x1[BN8_SIZE*2-1] = 1;
+	x2[BN8_SIZE*2-1] = 0;
+	
+	while(!bn8_is_one(u, BN8_SIZE) && !bn8_is_one(v, BN8_SIZE))
+	{
+		while(bn8_is_even(u, BN8_SIZE))
+		{
+			bn8_rshift1(u, BN8_SIZE);
+			if(bn8_is_even(x1, BN8_SIZE*2))
+			{
+				bn8_rshift1_2s(x1, BN8_SIZE*2);
+			} else {
+				bn8_add_shift(x1, p, 0);
+				bn8_rshift1_2s(x1, BN8_SIZE*2);
+			}
+		}
+		while(bn8_is_even(v, BN8_SIZE))
+		{
+			bn8_rshift1(v, BN8_SIZE);
+			if(bn8_is_even(x2, BN8_SIZE*2))
+			{
+				bn8_rshift1_2s(x2, BN8_SIZE*2);
+			} else {
+				bn8_add_shift(x2, p, 0);
+				bn8_rshift1_2s(x2, BN8_SIZE*2);
+			}
+		}
+		if(bn8_cmp(u, v) >= 0)
+		{
+			bn8_sub_acc(u, v, BN8_SIZE);			
+			bn8_sub_acc(x1, x2, BN8_SIZE*2);
+		} else {
+			bn8_sub_acc(v, u, BN8_SIZE);
+			bn8_sub_acc(x2, x1, BN8_SIZE*2);			
+		}
+	}
+	
+	if(bn8_is_one(u, BN8_SIZE))
+	{
+		bn8_copy(r, x1+BN8_SIZE, BN8_SIZE);
+	} else {
+		bn8_copy(r, x2+BN8_SIZE, BN8_SIZE);
+	}	
+}
+
+signed char bn8_cmp_n(const bn8 a, const bn8 b, uint8_t n)
+{
+	uint8_t i;
+	
+	for(i=0; i<n; i++)
+	{
+		if(a[i]>b[i]) return 1;
+		if(a[i]<b[i]) return -1;		
+	}
+	return 0;
+}
 
 signed char bn8_cmp64(const bn8 a, const bn8 b)
 {

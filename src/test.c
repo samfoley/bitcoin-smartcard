@@ -110,6 +110,10 @@ int main()
 	bn8_print(bn8_buffer_r); bn8_print(bn8_buffer_r+BN8_SIZE);
 	printf("\n\n");
 	
+	// test rshift
+	bn8_print(bn8_buffer_1); printf("\nrshift\n");
+	bn8_rshift1(bn8_buffer_1, BN8_SIZE); 
+	bn8_print(bn8_buffer_1); printf("\n");
 	// Point add/double tests
 	
 	Curve test_curve;
@@ -136,7 +140,7 @@ int main()
 	BN_bin2bn(&test_y1, 1, test1->y);
 	BN_bin2bn(&test_x2, 1, test2->x);
 	BN_bin2bn(&test_y2, 1, test2->y);
-	
+	/*
 	printf("\nTest a: "); BN_print_fp(stdout, test_curve.a);
 	printf("\nTest b: "); BN_print_fp(stdout, test_curve.b);
 	printf("\nTest p: "); BN_print_fp(stdout, test_curve.p);
@@ -155,7 +159,7 @@ int main()
 	printf("Test double x: "); BN_print_fp(stdout, test3->x);
 	printf("\nTest double y: "); BN_print_fp(stdout, test3->y);
 	printf("\n\n");
-	
+	*/
 	dA = BN_new();
 	_blkmk_b58tobin(priv_key_bin, sizeof(priv_key_bin), priv_key_b58, 0);
 	
@@ -299,7 +303,7 @@ ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char 
 	bn8_mod_add(tmp2, z, tmp, mod, ctx);
 	
 	BN_mod_inverse(tmp, k, mod, ctx);
-	bn8_mod_mul(s, tmp, tmp2, mod, ctx);
+	bn8_mod_mulN(s, tmp, tmp2, mod, ctx);
 	
 	printf("r: ");
 	BN_print_fp(stdout, r);
@@ -368,14 +372,15 @@ Point* point_add(Point *P, Point *Q, Curve *c)
 	bn8_mod_sub(tmp, Q->y, P->y, c->p, ctx);
 	//if (!BN_mod_sub(tmp2, Q->x, P->x, c->p, ctx)) goto err; // xq-xp
 	bn8_mod_sub(tmp2, Q->x, P->x, c->p, ctx);
-	if (!BN_mod_inverse(tmp3, tmp2, c->p, ctx)) goto err; // (xq-xp)^-1
-	bn8_mod_mul(lambda, tmp, tmp3, c->p, ctx);
+	//if (!BN_mod_inverse(tmp3, tmp2, c->p, ctx)) goto err; // (xq-xp)^-1
+	bn8_mod_inverse(tmp3, tmp2, c->p, ctx);
+	bn8_mod_mulP(lambda, tmp, tmp3, c->p, ctx);
 	//if (!BN_mod_mul(lambda, tmp, tmp3, c->p, ctx)) goto err; // (yq-yp)/(xq-xp)
 	
 	
 	// xr = lambda^2 - xp - xq
 	//if (!BN_mod_sqr(tmp, lambda, c->p, ctx)) goto err; // lambda^2
-	bn8_mod_mul(tmp, lambda, lambda, c->p, ctx);
+	bn8_mod_mulP(tmp, lambda, lambda, c->p, ctx);
 	//if (!BN_mod_sub(tmp2, tmp, P->x, c->p, ctx)) goto err; // lambda^2 - xp
 	bn8_mod_sub(tmp2, tmp, P->x, c->p, ctx);
 	//if (!BN_mod_sub(xr, tmp2, Q->x, c->p, ctx)) goto err; // lambda^2 - xp - xq
