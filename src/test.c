@@ -114,6 +114,15 @@ int main()
 	bn8_print(bn8_buffer_1); printf("\nrshift\n");
 	bn8_rshift1(bn8_buffer_1, BN8_SIZE); 
 	bn8_print(bn8_buffer_1); printf("\n");
+	// test rshift
+	printf("\nlshift\n");
+	bn8_lshift1(bn8_buffer_1, BN8_SIZE); 
+	bn8_print(bn8_buffer_1); printf("\n");
+	// test 3x
+	printf("3x\n");
+	bn8_mul3(bn8_buffer_r, bn8_buffer_1, BN8_SIZE);
+	bn8_printn(bn8_buffer_r, BN8_SIZE+1); printf("\n");
+	
 	// Point add/double tests
 	
 	Curve test_curve;
@@ -354,93 +363,253 @@ Point* point_at_infinity()
 	return p;
 }
 
-Point* point_add(Point *P, Point *Q, Curve *c)
+Point* point_add(Point *P, Point *Q, Curve *c_)
 {
-	BIGNUM *lambda = BN_new();
+	BIGNUM *lambdaBN = BN_new();
 	BIGNUM *tmp = BN_new();
 	BIGNUM *tmp2 = BN_new();
 	BIGNUM *tmp3 = BN_new();
 	
-	BIGNUM *xr = BN_new();
-	BIGNUM *yr = BN_new();
+	BIGNUM *xrBN = BN_new();
+	BIGNUM *yrBN = BN_new();
+	
+	uint8_t xq[BN8_SIZE];
+	uint8_t yq[BN8_SIZE];
+	uint8_t xp[BN8_SIZE];
+	uint8_t yp[BN8_SIZE];
+	
+	uint8_t xr[BN8_SIZE];
+	uint8_t yr[BN8_SIZE];
+	
+	uint8_t a[BN8_SIZE];
+	uint8_t b[BN8_SIZE];
+	uint8_t c[BN8_SIZE];
+	uint8_t dd[BN8_SIZE*2];
+	uint8_t r[BN8_SIZE+2];
+	uint8_t lambda[BN8_SIZE];
 	
 	if(P->at_infinity) return Q;
 	if(Q->at_infinity) return P;
-	
+	/*
 	// lambda = (yq-yp)/(xq-xp)
 	//if (!BN_mod_sub(tmp, Q->y, P->y, c->p, ctx)) goto err; // yq-yp
-	bn8_mod_sub(tmp, Q->y, P->y, c->p, ctx);
+	bn8_mod_sub(tmp, Q->y, P->y, c_->p, ctx);
 	//if (!BN_mod_sub(tmp2, Q->x, P->x, c->p, ctx)) goto err; // xq-xp
-	bn8_mod_sub(tmp2, Q->x, P->x, c->p, ctx);
-	//if (!BN_mod_inverse(tmp3, tmp2, c->p, ctx)) goto err; // (xq-xp)^-1
-	bn8_mod_inverse(tmp3, tmp2, c->p, ctx);
-	bn8_mod_mulP(lambda, tmp, tmp3, c->p, ctx);
-	//if (!BN_mod_mul(lambda, tmp, tmp3, c->p, ctx)) goto err; // (yq-yp)/(xq-xp)
+	bn8_mod_sub(tmp2, Q->x, P->x, c_->p, ctx);
+	//if (!BN_mod_inverse(tmp3, tmp2, c_p, ctx)) goto err; // (xq-xp)^-1
+	bn8_mod_inverse(tmp3, tmp2, c_->p, ctx);
+	bn8_mod_mulP(lambdaBN, tmp, tmp3, c_->p, ctx);
+	//if (!BN_mod_mul(lambdaBN, tmp, tmp3, c->p, ctx)) goto err; // (yq-yp)/(xq-xp)
+		
+	
+	// xr = lambdaBN^2 - xp - xq
+	//if (!BN_mod_sqr(tmp, lambdaBN, c_->p, ctx)) goto err; // lambdaBN^2
+	bn8_mod_mulP(tmp, lambdaBN, lambdaBN, c_->p, ctx);
+	//if (!BN_mod_sub(tmp2, tmp, P->x, c_->p, ctx)) goto err; // lambdaBN^2 - xp
+	bn8_mod_sub(tmp2, tmp, P->x, c_->p, ctx);
+	//if (!BN_mod_sub(xr, tmp2, Q->x, c_->p, ctx)) goto err; // lambdaBN^2 - xp - xq
+	bn8_mod_sub(xrBN, tmp2, Q->x, c_->p, ctx);
+	
+	// yr = lambdaBN(xp - xr) - yp
+	//if (!BN_mod_sub(tmp, P->x, xr, c_->p, ctx)) goto err; // xp - xr
+	bn8_mod_sub(tmp, P->x, xrBN, c_->p, ctx);
+	//if (!BN_mod_mul(tmp2, lambdaBN, tmp, c_->p, ctx)) goto err; // lambdaBN(xp-xr)
+	bn8_mod_mulP(tmp2, lambdaBN, tmp, c_->p, ctx);
+	//if (!BN_mod_sub(yr, tmp2, P->y, c_->p, ctx)) goto err; // lambdaBN(xp-xr) - yp
+	bn8_mod_sub(yrBN, tmp2, P->y, c_->p, ctx);
+	
+	*/
+	bn8_from_bn(xp, P->x);
+	bn8_from_bn(yp, P->y);
+	bn8_from_bn(xq, Q->x);
+	bn8_from_bn(yq, Q->y);
+	
+	// lambda = (yq-yp)/(xq-xp)
+	bn8_sub(a, yq, yp); // yq-yp	
+	bn8_sub(b, xq, xp); // xq-xp
+	
+	bn8_invert(dd, b, bn8_get_p()); // (xq-xp)^-1
+	bn8_copy(c, dd+2, BN8_SIZE);
+	bn8_mul(dd, a, c, BN8_SIZE, BN8_SIZE); // (yq-yp)/(xq-xp)
+	bn8_barrett_reduction_p(r, dd);
+	bn8_copy(lambda, r+2, BN8_SIZE);
 	
 	
 	// xr = lambda^2 - xp - xq
-	//if (!BN_mod_sqr(tmp, lambda, c->p, ctx)) goto err; // lambda^2
-	bn8_mod_mulP(tmp, lambda, lambda, c->p, ctx);
-	//if (!BN_mod_sub(tmp2, tmp, P->x, c->p, ctx)) goto err; // lambda^2 - xp
-	bn8_mod_sub(tmp2, tmp, P->x, c->p, ctx);
-	//if (!BN_mod_sub(xr, tmp2, Q->x, c->p, ctx)) goto err; // lambda^2 - xp - xq
-	bn8_mod_sub(xr, tmp2, Q->x, c->p, ctx);
+	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
+	bn8_barrett_reduction_p(r, dd);
+	bn8_copy(a, r+2, BN8_SIZE);
+	bn8_sub(b, a, xp); // lambda^2 - xp	
+	bn8_sub(xr, b, xq); // lambda^2 - xp - xq
+	
 	
 	// yr = lambda(xp - xr) - yp
-	//if (!BN_mod_sub(tmp, P->x, xr, c->p, ctx)) goto err; // xp - xr
-	bn8_mod_sub(tmp, P->x, xr, c->p, ctx);
-	if (!BN_mod_mul(tmp2, lambda, tmp, c->p, ctx)) goto err; // lambda(xp-xr)
-	if (!BN_mod_sub(yr, tmp2, P->y, c->p, ctx)) goto err; // lambda(xp-xr) - yp
+	bn8_sub(a, xp, xr); // xp - xr	
+	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
+	bn8_barrett_reduction_p(r, dd);
+	bn8_copy(b, r+2, BN8_SIZE);	
+	bn8_sub(yr, b, yp); // lambda(xp-xr) - yp	
+	
+	
+	BN_bin2bn(xr, BN8_SIZE, xrBN);
+	BN_bin2bn(yr, BN8_SIZE, yrBN);
+	
+	return point_new(xrBN, yrBN);
+	
+	// BN helper functions implementation
+	/*
+	
 		
 	return point_new(xr, yr);	
 	
 	err:
 	fprintf(stderr, "BN add error\n");
 	exit(1);
-	return NULL;
+	return NULL;*/
 	
 }
 
-Point* point_double(Point *P, Curve *c)
+Point* point_double(Point *P, Curve *c_)
 {
-	BIGNUM *lambda = BN_new();
+	BIGNUM *lambdaBN = BN_new();
 	BIGNUM *tmp = BN_new();
 	BIGNUM *tmp2 = BN_new();
 	BIGNUM *tmp3 = BN_new();
 	
-	BIGNUM *xr = BN_new();
-	BIGNUM *yr = BN_new();
+	BIGNUM *xrBN = BN_new();
+	BIGNUM *yrBN = BN_new();
+		
+	uint8_t xp[BN8_SIZE];
+	uint8_t yp[BN8_SIZE];
+	
+	uint8_t xr[BN8_SIZE];
+	uint8_t yr[BN8_SIZE];
+	
+	uint8_t a[BN8_SIZE];
+	uint8_t b[BN8_SIZE];
+	uint8_t c[BN8_SIZE];
+	uint8_t dd[BN8_SIZE*2];
+	uint8_t r[BN8_SIZE+2];
+	uint8_t lambda[BN8_SIZE];
 	
 	if(P->at_infinity) return P;
 	
 	
+	// lambdaBN = (3x^2 + a)/2y
+	if (!BN_lshift1(tmp,P->y)) goto err; // 2yp		
+	//bn8_lshift1(tmp,P->y)
+	if (!BN_mod(tmp3, tmp, c_->p, ctx)) goto err; // 2yp mod p
+	//bn8_mod(tmp3, tmp, c_->p, ctx);
+	//if (!BN_mod_sqr(tmp2, P->x, c_->p, ctx)) goto err; // xp^2		
+	bn8_mod_mulP(tmp2, P->x, P->x, c_->p, ctx);
+	
+	if (!BN_mul_word(tmp2, 3)) goto err; // 3xp^2
+	if (!BN_mod(tmp, tmp2, c_->p, ctx)) goto err; // 3xp^2 mod p	
+	//if(!BN_mod_add(tmp2, tmp, c_->a, c_->p, ctx)) goto err; // 3xp^2+a
+	bn8_mod_add(tmp2, tmp, c_->a, c_->p, ctx);
+	//if (!BN_mod_inverse(tmp, tmp3, c_->p, ctx)) goto err; // (2yp)^-1
+	bn8_mod_inverse(tmp, tmp3, c_->p, ctx);
+	//if (!BN_mod_mul(lambdaBN, tmp2, tmp, c_->p, ctx)) goto err; // lambdaBN = (3xp^2+a)(2yp)^-1
+	bn8_mod_mulP(lambdaBN, tmp2, tmp, c_->p, ctx);
+	
+	// xr = lambdaBN^2 - 2x
+	if (!BN_mod_sqr(tmp, lambdaBN, c_->p, ctx)) goto err; // lambdaBN^2
+	if (!BN_lshift1(tmp2, P->x)) goto err; // 2xp
+	if (!BN_mod(tmp3, tmp2, c_->p, ctx)) goto err; // 2xp mod p
+	//if (!BN_mod_sub(xr, tmp, tmp3, c_->p, ctx)) goto err; // lambdaBN^2 - 2xp
+	bn8_mod_sub(xrBN, tmp, tmp3, c_->p, ctx);
+	
+	// yr = lambdaBN(x - xr) - y
+	//if (!BN_mod_sub(tmp, P->x, xr, c_->p, ctx)) goto err; // xp-xr
+	bn8_mod_sub(tmp, P->x, xrBN, c_->p, ctx);
+	//if (!BN_mod_mul(tmp2, lambdaBN, tmp, c_->p, ctx)) goto err; // lambdaBN(xp-xr)
+	bn8_mod_mulP(tmp2, lambdaBN, tmp, c_->p, ctx);
+	//if (!BN_mod_sub(yr, tmp2, P->y, c_->p, ctx)) goto err; // lambdaBN(xp-xr) - yp
+	bn8_mod_sub(yrBN, tmp2, P->y, c_->p, ctx);
+	
+	
+	bn8_from_bn(xp, P->x);
+	bn8_from_bn(yp, P->y);	
+	
+	// lambda = (3x^2 + a)/2y
+	r[0]=0;
+	bn8_copy(r+1, yp, BN8_SIZE);
+	bn8_lshift1(r, BN8_SIZE+1); // 2yp		
+	bn8_mod(r, bn8_get_p(), BN8_SIZE+1);
+	bn8_copy(a, r+1, BN8_SIZE);
+	
+	bn8_mul(dd, xp, xp, BN8_SIZE, BN8_SIZE); // xp^2		
+	bn8_barrett_reduction_p(r, dd);		
+	
+	
+	bn8_mul3(dd, r+2, BN8_SIZE); // 3xp^2
+	bn8_mod(dd, bn8_get_p(), BN8_SIZE+1);
+	bn8_copy(b, dd+1, BN8_SIZE);
+	
+	bn8_invert(r, a, bn8_get_p()); // (2yp)^-1
+	
+	bn8_mul(dd, b, r+2, BN8_SIZE, BN8_SIZE); // lambda = (3xp^2+a)(2yp)^-1
+	bn8_barrett_reduction_p(r, dd);
+	bn8_copy(lambda, r+2, BN8_SIZE);
+	bn8_cmp_bn(lambda, BN8_SIZE, lambdaBN, 1);
+	
+	// xr = lambda^2 - 2x	
+	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
+	bn8_barrett_reduction_p(r, dd);
+	bn8_copy(a, r+2, BN8_SIZE);
+		
+	bn8_copy(r+1, xp, BN8_SIZE);
+	bn8_lshift1(r, BN8_SIZE+1); // 2xp
+	bn8_mod(r, bn8_get_p(), BN8_SIZE+1);
+		
+	bn8_sub(xr, a, r+1); // lambda^2 - 2xp
+	bn8_cmp_bn(xr, BN8_SIZE, xrBN, 2);
+	
+	// yr = lambda(xp - xr) - yp
+	bn8_sub(a, xp, xr); // xp-xr			
+	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
+	bn8_barrett_reduction_p(r, dd);	
+	bn8_sub(yr, r+2, yp); // lambda(xp-xr) - yp
+	bn8_cmp_bn(yr, BN8_SIZE, yrBN, 3);
+	
+	BN_bin2bn(xr, BN8_SIZE, xrBN);
+	BN_bin2bn(yr, BN8_SIZE, yrBN);	
+	return point_new(xrBN, yrBN);
+	
+	// BN helper implementation
+	/*
 	// lambda = (3x^2 + a)/2y
 	if (!BN_lshift1(tmp,P->y)) goto err; // 2yp		
+	//bn8_lshift1(tmp,P->y)
 	if (!BN_mod(tmp3, tmp, c->p, ctx)) goto err; // 2yp mod p
-	if (!BN_mod_sqr(tmp2, P->x, c->p, ctx)) goto err; // xp^2		
+	//bn8_mod(tmp3, tmp, c->p, ctx);
+	//if (!BN_mod_sqr(tmp2, P->x, c->p, ctx)) goto err; // xp^2		
+	bn8_mod_mulP(tmp2, P->x, P->x, c->p, ctx);
 	if (!BN_mul_word(tmp2, 3)) goto err; // 3xp^2
 	if (!BN_mod(tmp, tmp2, c->p, ctx)) goto err; // 3xp^2 mod p
-	if(!BN_mod_add(tmp2, tmp, c->a, c->p, ctx)) goto err; // 3xp^2+a
-	if (!BN_mod_inverse(tmp, tmp3, c->p, ctx)) goto err; // (2yp)^-1
-	if (!BN_mod_mul(lambda, tmp2, tmp, c->p, ctx)) goto err; // lambda = (3xp^2+a)(2yp)^-1
+	//if(!BN_mod_add(tmp2, tmp, c->a, c->p, ctx)) goto err; // 3xp^2+a
+	bn8_mod_add(tmp2, tmp, c->a, c->p, ctx);
+	//if (!BN_mod_inverse(tmp, tmp3, c->p, ctx)) goto err; // (2yp)^-1
+	bn8_mod_inverse(tmp, tmp3, c->p, ctx);
+	//if (!BN_mod_mul(lambda, tmp2, tmp, c->p, ctx)) goto err; // lambda = (3xp^2+a)(2yp)^-1
+	bn8_mod_mulP(lambda, tmp2, tmp, c->p, ctx);
 	
 	// xr = lambda^2 - 2x
 	if (!BN_mod_sqr(tmp, lambda, c->p, ctx)) goto err; // lambda^2
 	if (!BN_lshift1(tmp2, P->x)) goto err; // 2xp
 	if (!BN_mod(tmp3, tmp2, c->p, ctx)) goto err; // 2xp mod p
-	if (!BN_mod_sub(xr, tmp, tmp3, c->p, ctx)) goto err; // lambda^2 - 2xp
+	//if (!BN_mod_sub(xr, tmp, tmp3, c->p, ctx)) goto err; // lambda^2 - 2xp
+	bn8_mod_sub(xr, tmp, tmp3, c->p, ctx);
 	
 	// yr = lambda(x - xr) - y
-	if (!BN_mod_sub(tmp, P->x, xr, c->p, ctx)) goto err; // xp-xr
-	if (!BN_mod_mul(tmp2, lambda, tmp, c->p, ctx)) goto err; // lambda(xp-xr)
-	if (!BN_mod_sub(yr, tmp2, P->y, c->p, ctx)) goto err; // lambda(xp-xr) - yp
-	
-	return point_new(xr, yr);
-	
-	err:
-	fprintf(stderr, "BN double error\n");
-	exit(1);
-	return NULL;	
+	//if (!BN_mod_sub(tmp, P->x, xr, c->p, ctx)) goto err; // xp-xr
+	bn8_mod_sub(tmp, P->x, xr, c->p, ctx);
+	//if (!BN_mod_mul(tmp2, lambda, tmp, c->p, ctx)) goto err; // lambda(xp-xr)
+	bn8_mod_mulP(tmp2, lambda, tmp, c->p, ctx);
+	//if (!BN_mod_sub(yr, tmp2, P->y, c->p, ctx)) goto err; // lambda(xp-xr) - yp
+	bn8_mod_sub(yr, tmp2, P->y, c->p, ctx);
+	*/
+	err: return;	
 }
 
 Point* ec_point_mul_old(Point *P, BIGNUM *n, Curve *c)

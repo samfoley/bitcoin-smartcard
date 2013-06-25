@@ -19,6 +19,7 @@ uint8_t U0_P[10] = {0x01, 0x00, 0x00, 0x03, 0xd1};
 uint8_t U0_N[17] = {0x01, 0x45, 0x51, 0x23, 0x19, 0x50, 0xb7, 0x5f, 0xc4, 0x40, 0x2d, 0xa1, 0x73, 0x2f, 0xc9, 0xbe, 0xc0};
 
 #define MOD_P (MOD_0000P+4)
+#define MOD_N (MOD_0000N+4)
 
 void bn8_to_bn(BIGNUM *r, bn8 a)
 {
@@ -210,12 +211,12 @@ void bn8_mod_inverse(BIGNUM *ret, BIGNUM *a, BIGNUM *mod, BN_CTX *ctx)
 	
 	bn8_from_bn(t1, a);
 	bn8_from_bn(t2, mod);
-	bn8_invert(t3, t1, t2);
+	bn8_invert(tr, t1, t2);
 	
-	bn8_to_bn(tmp, t3);		
+	BN_bin2bn(tr, 34, ret);	
 	
 	BN_mod_inverse(tmp2, a, mod, ctx);
-	BN_nnmod(ret, tmp, mod, ctx);
+	//BN_nnmod(ret, tmp, mod, ctx);
 	
 	if(BN_cmp(ret,tmp2)) {
 		printf("\n\ninverse error \n");
@@ -225,7 +226,7 @@ void bn8_mod_inverse(BIGNUM *ret, BIGNUM *a, BIGNUM *mod, BN_CTX *ctx)
 		bn8_print(t3); printf("\nbn8=");
 		BN_print_fp(stdout, ret);printf("\nBN= ");
 		BN_print_fp(stdout, tmp2);printf("\n");
-	}	
+	} 
 	BN_free(tmp);
 }
 
@@ -315,6 +316,30 @@ void bn8_add_n(bn8 r, bn8 a, uint8_t n)
 	r[0] = r[0]+carry;
 }
 
+void bn8_add_n32(bn8 r, bn8 a, uint8_t n)
+{
+	int i;
+	uint8_t carry;
+	uint16_t sum;
+	
+	sum = r[n-1]+a[BN8_SIZE-1];
+	carry = (sum&0xff00) ? 1:0;
+	r[n-1] = sum&0xff;
+	
+	for(i=2; i<=BN8_SIZE; i++)
+	{
+		sum = r[n-i]+a[BN8_SIZE-i]+carry;
+		carry = (sum&0xff00) ? 1:0;
+		r[n-i] = sum&0xff;
+	}
+	for(; i<n; i++)
+	{
+		sum = r[n-i]+carry;
+		carry = (sum&0xff00) ? 1:0;
+		r[n-i] = sum&0xff;
+	}
+	r[0] = r[0]+carry;	
+}
 void bn8_sub(bn8 r, const bn8 a, const bn8 b)
 {
 	int i;
@@ -339,6 +364,13 @@ void bn8_sub_acc(bn8 r, const bn8 a, uint8_t size)
 	int i;
 	uint8_t carry, carry1;
 	uint16_t sum;
+	BIGNUM *rBN = BN_new();
+	BIGNUM *aBN = BN_new();
+	BIGNUM *raBN = BN_new();
+	BIGNUM *retBN = BN_new();
+	
+	BN_bin2bn(r, size, rBN);
+	BN_bin2bn(a, size, aBN);
 	
 	sum = r[size-1]-a[size-1];
 	carry = (sum&0xff00) ? 1:0;
@@ -351,7 +383,16 @@ void bn8_sub_acc(bn8 r, const bn8 a, uint8_t size)
 		carry = (sum&0xff00) ? 1:0;
 		r[i] = sum&0xff;
 	}	
-	if(carry ^ carry1) printf("overflow\n");
+	BN_sub(raBN, rBN, aBN);
+	BN_bin2bn(r, size, retBN);
+	/*if(BN_cmp(raBN, retBN) != 0) {
+		
+		printf("sub_acc error %d %d %d\nr ", size, carry, carry1);
+		BN_print_fp(stdout, rBN); printf("\na ");
+		BN_print_fp(stdout, aBN); printf("\n");
+		BN_print_fp(stdout, raBN); printf("\n");
+		bn8_printn(r, size); printf("\n");
+	}*/
 }
 
 void bn8_subc(bn8 r, uint8_t c, const bn8 a)
@@ -419,6 +460,36 @@ void bn8_sub64(bn8 r, bn8 a)
 	}
 }
 
+// r = r - a
+// r is size_r bytes
+// a is size_a bytes
+// size_a <= size_r
+void bn8_sub_nn(bn8 r, uint8_t size_r, bn8 a, uint8_t size_a)
+{
+	int i;
+	uint8_t carry;
+	uint16_t sum;
+	
+	sum = r[size_r-1]-a[size_a-1];
+	carry = (sum&0xff00) ? 1:0;
+	r[size_r-1] = sum&0xff;
+	
+	for(i=size_a-2; i>=0; i--)
+	{
+		sum = r[i+size_r-size_a]-a[i]-carry;
+		carry = (sum&0xff00) ? 1:0;
+		r[i+size_r-size_a] = sum&0xff;
+	}	
+	if(size_r-size_a)
+	{
+		for(i=size_r-size_a-1; i>=0; i--)
+		{
+			sum = r[i]-carry;
+			carry = (sum&0xff00) ? 1:0;
+			r[i] = sum&0xff;
+		}
+	}
+}
 
 void bn8_print(const bn8 a)
 {
@@ -447,6 +518,15 @@ void bn8_zero(bn8 r, uint8_t size)
 		r++;
 		size--;
 	}
+}
+
+// r = r % mod
+// mod 32 bytes
+// r size bytes
+void bn8_mod(bn8 r, bn8 mod, uint8_t size)
+{
+	while(bn8_cmp_nn(r, size, mod, BN8_SIZE) > 0)
+		bn8_sub_nn(r, size, mod, BN8_SIZE);	
 }
 
 // reduces c based on septk1256
@@ -539,8 +619,8 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	bn8_from_bn(r+BN8_SIZE, rBN);
 	return;
 	
-	while(bn8_cmp64(r, MOD_P) > 0)
-		bn8_sub64(r, MOD_P);	
+	while(bn8_cmp_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE) > 0)
+		bn8_sub_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE);	
 	
 }
 
@@ -569,9 +649,9 @@ void bn8_barrett_reduction_p(bn8 r, bn8 z)
 		
 	bn8_sub_n(r, q_p+BN8_SIZE, BN8_SIZE+2);
 	
-	while(bn8_cmp_n(r, MOD_0000P+2, BN8_SIZE+2) > 0)
+	while(bn8_cmp_nn(r, BN8_SIZE+2, MOD_P, BN8_SIZE) > 0)
 	{
-		bn8_sub_n(r, MOD_0000P+3, BN8_SIZE+2);
+		bn8_sub_nn(r, BN8_SIZE+2, MOD_P, BN8_SIZE);
 	}
 }
 
@@ -600,9 +680,9 @@ void bn8_barrett_reduction_n(bn8 r, bn8 z)
 		
 	bn8_sub_n(r, q_p+BN8_SIZE, BN8_SIZE+2);
 	
-	while(bn8_cmp_n(r, MOD_0000N+2, BN8_SIZE+2) > 0)
+	while(bn8_cmp_nn(r, BN8_SIZE+2, MOD_N, BN8_SIZE) > 0)
 	{
-		bn8_sub_n(r, MOD_0000N+3, BN8_SIZE+2);
+		bn8_sub_nn(r, BN8_SIZE+2, MOD_N, BN8_SIZE);
 	}
 }
 
@@ -681,6 +761,19 @@ void bn8_rshift1(bn8 r, uint8_t size)
 	r[0] = r[0]>>1;
 }
 
+void bn8_lshift1(bn8 r, uint8_t size)
+{
+	uint8_t i;
+	uint8_t carry;		
+		
+	for(i=0; i<size-1; i++)
+	{
+		carry = r[i+1]>>7;
+		r[i] = r[i]<<1 | carry;
+	}
+	r[size-1] = r[size-1] << 1;
+}
+
 void bn8_rshift1_2s(bn8 r, uint8_t size)
 {
 	uint8_t i;
@@ -718,6 +811,17 @@ void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t sizex, uint8_t sizey)
 		r[i]=((uv>>8) &0xff);
 	}
 }
+
+// r = 3x
+// r is sizex+1 bytes
+void bn8_mul3(bn8 r, bn8 x, uint8_t sizex)
+{
+	r[0] = 0;
+	bn8_copy(r+1, x, sizex);
+	bn8_lshift1(r, sizex+1);
+	bn8_add_n(r, x, sizex+1);
+}
+
 /*
 void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t size)
 {
@@ -778,12 +882,14 @@ void bn8_copy(bn8 r, bn8 a, uint8_t size)
 		r[i] = a[i];
 }
 
+#define X_SIZE (BN8_SIZE*2)
+
 void bn8_invert(bn8 r, bn8 a, bn8 p)
 {
 	uint8_t u[BN8_SIZE];
 	uint8_t v[BN8_SIZE];
-	uint8_t x1[BN8_SIZE*2] = {0};
-	uint8_t x2[BN8_SIZE*2] = {0};
+	uint8_t x1[X_SIZE] = {0};
+	uint8_t x2[X_SIZE] = {0};
 	
 	bn8_copy(u, a, BN8_SIZE);
 	bn8_copy(v, p, BN8_SIZE);
@@ -795,40 +901,46 @@ void bn8_invert(bn8 r, bn8 a, bn8 p)
 		while(bn8_is_even(u, BN8_SIZE))
 		{
 			bn8_rshift1(u, BN8_SIZE);
-			if(bn8_is_even(x1, BN8_SIZE*2))
+			if(bn8_is_even(x1, X_SIZE))
 			{
-				bn8_rshift1_2s(x1, BN8_SIZE*2);
+				bn8_rshift1_2s(x1, X_SIZE);
 			} else {
-				bn8_add_shift(x1, p, 0);
-				bn8_rshift1_2s(x1, BN8_SIZE*2);
+				bn8_add_n32(x1, p, X_SIZE);
+				bn8_rshift1_2s(x1, X_SIZE);
 			}
 		}
 		while(bn8_is_even(v, BN8_SIZE))
 		{
 			bn8_rshift1(v, BN8_SIZE);
-			if(bn8_is_even(x2, BN8_SIZE*2))
+			if(bn8_is_even(x2, X_SIZE))
 			{
-				bn8_rshift1_2s(x2, BN8_SIZE*2);
+				bn8_rshift1_2s(x2, X_SIZE);
 			} else {
-				bn8_add_shift(x2, p, 0);
-				bn8_rshift1_2s(x2, BN8_SIZE*2);
+				bn8_add_n32(x2, p, X_SIZE);
+				bn8_rshift1_2s(x2, X_SIZE);
 			}
 		}
 		if(bn8_cmp(u, v) >= 0)
 		{
 			bn8_sub_acc(u, v, BN8_SIZE);			
-			bn8_sub_acc(x1, x2, BN8_SIZE*2);
+			bn8_sub_acc(x1, x2, X_SIZE);
 		} else {
 			bn8_sub_acc(v, u, BN8_SIZE);
-			bn8_sub_acc(x2, x1, BN8_SIZE*2);			
+			bn8_sub_acc(x2, x1, X_SIZE);			
 		}
 	}
 	
 	if(bn8_is_one(u, BN8_SIZE))
 	{
-		bn8_copy(r, x1+BN8_SIZE, BN8_SIZE);
+		if(x1[0] & 0x80) bn8_add_n32(x1, p, X_SIZE);
+		while(bn8_cmp64(x1, MOD_P) > 0)
+			bn8_sub64(x1, MOD_P);	
+		bn8_copy(r+2, x1+BN8_SIZE, BN8_SIZE);		
 	} else {
-		bn8_copy(r, x2+BN8_SIZE, BN8_SIZE);
+		if(x2[0] & 0x80) bn8_add_n32(x2, p, X_SIZE);
+		while(bn8_cmp64(x2, MOD_P) > 0)
+			bn8_sub64(x2, MOD_P);	
+		bn8_copy(r+2, x2+BN8_SIZE, BN8_SIZE);		
 	}	
 }
 
@@ -859,6 +971,26 @@ signed char bn8_cmp64(const bn8 a, const bn8 b)
 	return 0;
 }
 
+// compares a and b
+// a > b   = 1
+// a == b  = 0
+// a < b   = -1
+// requires sizeb <= sizea
+signed char bn8_cmp_nn(const bn8 a, uint8_t sizea, const bn8 b, uint8_t sizeb)
+{
+	char i;	
+	for(i=0; i<sizea-sizeb; i++)
+	{
+		if(a[i]) return 1;
+	}
+	for(i=0; i<sizeb; i++)
+	{
+		if(a[i+sizea-sizeb]>b[i]) return 1;
+		if(a[i+sizea-sizeb]<b[i]) return -1;		
+	}
+	return 0;
+}
+
 signed char bn8_cmp(const bn8 a, const bn8 b)
 {
 	char i;	
@@ -884,4 +1016,20 @@ signed char bn8_cmpc(const bn8 a, const uint8_t c, const bn8 b)
 		if(a[i]<b[i]) return -1;		
 	}
 	return 0;
+}
+
+bn8 bn8_get_p()
+{
+	return MOD_P;
+}
+
+void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int i)
+{
+	BIGNUM *aBN = BN_new();
+	BN_bin2bn(a, size, aBN);
+	if(BN_cmp(aBN, b) != 0) {
+		printf("cmp fail %d\n", i);
+		BN_print_fp(stdout, aBN); printf("\n");
+		BN_print_fp(stdout, b); printf("\n");
+	}
 }
