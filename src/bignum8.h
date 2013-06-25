@@ -51,6 +51,8 @@ void bn8_lshift(bn8 r, uint8_t n);
 void bn8_invert(bn8 r, bn8 a, bn8 p);
 
 bn8 bn8_get_p();
+bn8 bn8_get_n();
+
 void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int message);
 
 signed char bn8_cmp(const bn8 a, const bn8 b);
@@ -66,5 +68,6 @@ void bn8_rshift1_2s(bn8 r, uint8_t size);
 uint8_t bn8_is_even(bn8 a, uint8_t size);
 uint8_t bn8_is_one(bn8 a, uint8_t size);
 void bn8_copy(bn8 r, bn8 a, uint8_t size);
+uint8_t bn8_is_bit_set(bn8 a, uint8_t i);
 
 #endif

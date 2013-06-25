@@ -43,15 +43,16 @@ const char n_hex[] = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0
 int h = 1;
 BN_CTX *ctx = NULL;
 BIGNUM *mod = NULL;
-BIGNUM *dA = NULL;
+BIGNUM *dA_BN = NULL;
 
 ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char *sig, int *siglen);
 
-Point* ec_point_mul(Point *P, BIGNUM *n, Curve *c);
 Point* point_new(BIGNUM *x, BIGNUM *y);
 Point* point_at_infinity();
-Point *point_add(Point *P, Point *Q, Curve *c);
-Point *point_double(Point *P, Curve *c);
+
+void ec_point_mul(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 k);
+void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp);
+void point_add(bn8 xr, bn8 y, bn8 xp, bn8 yp, bn8 xq, bn8 yq);
 
 void print_bn(BIGNUM *b)
 {
@@ -169,12 +170,12 @@ int main()
 	printf("\nTest double y: "); BN_print_fp(stdout, test3->y);
 	printf("\n\n");
 	*/
-	dA = BN_new();
+	dA_BN = BN_new();
 	_blkmk_b58tobin(priv_key_bin, sizeof(priv_key_bin), priv_key_b58, 0);
 	
-	BN_bin2bn(&priv_key_bin[1], 32, dA);
+	BN_bin2bn(&priv_key_bin[1], 32, dA_BN);
 	
-	BN_hex2bn(&dA, Da_hex);
+	BN_hex2bn(&dA_BN, Da_hex);
 	
 	if (eckey == NULL)
     {
@@ -201,7 +202,7 @@ int main()
 		fprintf(stderr,"EC new point fail\n");
 		return -1;
 	}
-	if (!EC_POINT_mul(group, pub_key, dA, NULL, NULL, ctx))
+	if (!EC_POINT_mul(group, pub_key, dA_BN, NULL, NULL, ctx))
 	{
 		fprintf(stderr,"EC mul fail\n");
 		return -1;
@@ -213,7 +214,7 @@ int main()
 	BN_print_fp(stdout, tmp);
 	printf("\n");
 	
-	EC_KEY_set_private_key(eckey,dA);
+	EC_KEY_set_private_key(eckey,dA_BN);
     EC_KEY_set_public_key(eckey,pub_key);
 	// Second step: compute the ECDSA signature of a SHA-1 hash value using ECDSA_do_sign
 
@@ -248,17 +249,41 @@ int main()
                         32, ecsig, eckey));
 }
 
-ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char *sig, int *siglen)
+ECDSA_SIG* ECDSA_test_sign(unsigned char *z, int digest_len, unsigned char *sig, int *siglen)
 {
-	Curve c;
+	uint8_t Gx[BN8_SIZE];
+	uint8_t Gy[BN8_SIZE];
+	uint8_t x1[BN8_SIZE];
+	uint8_t y1[BN8_SIZE];
+	uint8_t k[BN8_SIZE];
+	uint8_t dA[BN8_SIZE];
+	uint8_t r_[BN8_SIZE+2];
+	uint8_t s_[BN8_SIZE+2];
+	
+	uint8_t dd[BN8_SIZE*2];
+	uint8_t tmp[BN8_SIZE+2] = {0};
+	uint8_t tmp2[BN8_SIZE+2] = {0};
+	
+	bn8 r = r_+2;
+	bn8 s = s_+2;
+	
+	// REMOVE THESE!
+	BIGNUM *tmpBN = BN_new();
+	BIGNUM *tmp2BN = BN_new();
+	BIGNUM *n = BN_new();
+	BIGNUM *kBN = BN_new();
 	ECDSA_SIG *ecsig = ECDSA_SIG_new();
+	
+	/*
+	Curve c;
+	
 	
 	BIGNUM *p = BN_new();
 	BIGNUM *b = BN_new();
 	//BIGNUM *G = BN_new();
 	Point *G = point_new(BN_new(), BN_new());	
 	BIGNUM *n = BN_new();
-	BIGNUM *k = BN_new();
+	BIGNUM *kBN = BN_new();
 	BIGNUM *z = BN_new();
 	BIGNUM *r = BN_new();
 	BIGNUM *s = BN_new();	
@@ -280,66 +305,106 @@ ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char 
 	c.a = BN_new();
 	BN_zero(c.a);
 	
-	// EC Tests
-	printf("\n\n");
-	BIGNUM *m = BN_new();
-	BN_hex2bn(&m, "AA5E28D6A97A2479A65527F7290311A3624D4CC0FA1578598EE3C2613BF99522");
-	point = ec_point_mul(G, m, &c);
-	printf("\nQm x: ");
-	BN_print_fp(stdout, point->x);	
-	printf("\nQm y: ");
-	BN_print_fp(stdout, point->y);	
-	printf("\n\n");
+	
 	
 	// 2. 
 	BN_bin2bn(digest, digest_len, z);
+	*/
+	
+	
+	
+	BN_hex2bn(&tmpBN, Gx_hex);
+	bn8_from_bn(Gx, tmpBN);
+	BN_hex2bn(&tmpBN, Gy_hex);
+	bn8_from_bn(Gy, tmpBN);
+	
+	// EC Tests
+	printf("\n\n");
+	BIGNUM *mBN = BN_new();
+	BN_hex2bn(&mBN, "AA5E28D6A97A2479A65527F7290311A3624D4CC0FA1578598EE3C2613BF99522");
+	
+	bn8_from_bn(tmp, mBN);
+	
+	ec_point_mul(x1, y1, Gx, Gy, tmp);
+	printf("\nQm x: ");
+	bn8_print(x1);
+	printf("\nQm y: ");
+	bn8_print(y1);
+	printf("\n\n");
+	
+	bn8_from_bn(dA, dA_BN);
 	
 	// 3. select random k
-	BN_sub(tmp, n, BN_value_one()); //n-1
-	BN_rand_range(k, tmp);
+	BN_hex2bn(&n, n_hex);
+	BN_sub(tmpBN, n, BN_value_one()); //n-1
+	BN_rand_range(kBN, tmpBN);
+	bn8_from_bn(k, kBN);
 	
-	// 4. (x1,y1) = k * G
+	// 4. (x1,y1) = k * G			
+	ec_point_mul(x1, y1, Gx, Gy, k);
 	
-	curve_point = ec_point_mul(G, k, &c);
+	// 5. r = x1 (mod n)	
+	bn8_copy(r, x1, BN8_SIZE);
+	bn8_mod(r, bn8_get_n(), BN8_SIZE);
 	
+	// 6. s = k^-1(z + rdA) (mod n)	
+	bn8_mul(dd, r, dA, BN8_SIZE, BN8_SIZE); // r*dA
+	bn8_barrett_reduction_n(tmp, dd); // r*dA (mod n)
+	bn8_add_n(tmp+1, z, BN8_SIZE+1); // z + r*dA
+	bn8_mod(tmp+1, bn8_get_n(), BN8_SIZE+1); // (z + rdA) (mod n)
 	
-	// 5. r = x1 (mod n)
-	BN_nnmod(r, curve_point->x, mod, ctx);
+	bn8_invert(tmp2, k, bn8_get_n()); // k^-1
+	bn8_mul(dd, tmp+2, tmp2+2, BN8_SIZE, BN8_SIZE); // k^-1(z + rdA) (mod n)
+	bn8_barrett_reduction_n(s_, dd);
 	
-	// 6. s = k^-1(z + rdA) (mod n)
-	BN_mod_mul(tmp, r, dA, mod, ctx);
-	
-	bn8_mod_add(tmp2, z, tmp, mod, ctx);
-	
-	BN_mod_inverse(tmp, k, mod, ctx);
-	bn8_mod_mulN(s, tmp, tmp2, mod, ctx);
 	
 	printf("r: ");
-	BN_print_fp(stdout, r);
+	bn8_print(r);
 	printf("\ns: ");
-	BN_print_fp(stdout, s);
+	bn8_print(s);
 	printf("\n");
 	
-	ecsig->r=r;
-	ecsig->s=s;
+	BN_bin2bn(r, BN8_SIZE, ecsig->r);
+	BN_bin2bn(s, BN8_SIZE, ecsig->s);
+	
 	return ecsig;
 }
 
-Point* ec_point_mul(Point *P, BIGNUM *k, Curve *c)
+void ec_point_mul(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
 {
-	Point *Q = point_at_infinity();
+	uint8_t xq[BN8_SIZE] = {0};
+	uint8_t yq[BN8_SIZE] = {0};
+	uint8_t xp[BN8_SIZE];
+	uint8_t yp[BN8_SIZE];
+	uint8_t q_at_infinity = 1;
+	
 	int i = 0;
 	
-	for(i=0; i<BN_num_bits(k); i++)
+	bn8_copy(xp, xp_, BN8_SIZE);
+	bn8_copy(yp, yp_, BN8_SIZE);
+	
+	for(i=0; i<256; i++)
 	{
-		if(BN_is_bit_set(k,i))
+		if(bn8_is_bit_set(k,i))
 		{
-			Q = point_add(Q, P, c);
-		}
-		P = point_double(P, c);
+			if(q_at_infinity)
+			{
+				bn8_copy(xq, xp, BN8_SIZE);
+				bn8_copy(yq, yp, BN8_SIZE);
+				q_at_infinity=0;
+			} else {							
+				point_add(xr, yr, xq, yq, xp, yp);
+				bn8_copy(xq, xr, BN8_SIZE);
+				bn8_copy(yq, yr, BN8_SIZE);
+			}
+		}		
+		point_double(xr, yr, xp, yp);
+		bn8_copy(xp, xr, BN8_SIZE);
+		bn8_copy(yp, yr, BN8_SIZE);
 	}
 	
-	return Q;
+	bn8_copy(xr, xq, BN8_SIZE);
+	bn8_copy(yr, yq, BN8_SIZE);
 }
 
 Point* point_new(BIGNUM *x, BIGNUM *y)
@@ -362,9 +427,11 @@ Point* point_at_infinity()
 	p->at_infinity = true;
 	return p;
 }
+//Point* point_add(Point *P, Point *Q, Curve *c_)
 
-Point* point_add(Point *P, Point *Q, Curve *c_)
+void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq)
 {
+/*
 	BIGNUM *lambdaBN = BN_new();
 	BIGNUM *tmp = BN_new();
 	BIGNUM *tmp2 = BN_new();
@@ -379,7 +446,7 @@ Point* point_add(Point *P, Point *Q, Curve *c_)
 	uint8_t yp[BN8_SIZE];
 	
 	uint8_t xr[BN8_SIZE];
-	uint8_t yr[BN8_SIZE];
+	uint8_t yr[BN8_SIZE];*/
 	
 	uint8_t a[BN8_SIZE];
 	uint8_t b[BN8_SIZE];
@@ -388,8 +455,8 @@ Point* point_add(Point *P, Point *Q, Curve *c_)
 	uint8_t r[BN8_SIZE+2];
 	uint8_t lambda[BN8_SIZE];
 	
-	if(P->at_infinity) return Q;
-	if(Q->at_infinity) return P;
+//!	if(P->at_infinity) return Q;
+//!	if(Q->at_infinity) return P;
 	/*
 	// lambda = (yq-yp)/(xq-xp)
 	//if (!BN_mod_sub(tmp, Q->y, P->y, c->p, ctx)) goto err; // yq-yp
@@ -419,10 +486,10 @@ Point* point_add(Point *P, Point *Q, Curve *c_)
 	bn8_mod_sub(yrBN, tmp2, P->y, c_->p, ctx);
 	
 	*/
-	bn8_from_bn(xp, P->x);
+	/*bn8_from_bn(xp, P->x);
 	bn8_from_bn(yp, P->y);
 	bn8_from_bn(xq, Q->x);
-	bn8_from_bn(yq, Q->y);
+	bn8_from_bn(yq, Q->y);*/
 	
 	// lambda = (yq-yp)/(xq-xp)
 	bn8_sub(a, yq, yp); // yq-yp	
@@ -450,11 +517,11 @@ Point* point_add(Point *P, Point *Q, Curve *c_)
 	bn8_copy(b, r+2, BN8_SIZE);	
 	bn8_sub(yr, b, yp); // lambda(xp-xr) - yp	
 	
-	
+	/*
 	BN_bin2bn(xr, BN8_SIZE, xrBN);
 	BN_bin2bn(yr, BN8_SIZE, yrBN);
 	
-	return point_new(xrBN, yrBN);
+	return point_new(xrBN, yrBN);*/
 	
 	// BN helper functions implementation
 	/*
@@ -469,9 +536,11 @@ Point* point_add(Point *P, Point *Q, Curve *c_)
 	
 }
 
-Point* point_double(Point *P, Curve *c_)
+//Point* point_double(Point *P, Curve *c_)
+
+void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp)
 {
-	BIGNUM *lambdaBN = BN_new();
+/*	BIGNUM *lambdaBN = BN_new();
 	BIGNUM *tmp = BN_new();
 	BIGNUM *tmp2 = BN_new();
 	BIGNUM *tmp3 = BN_new();
@@ -483,7 +552,7 @@ Point* point_double(Point *P, Curve *c_)
 	uint8_t yp[BN8_SIZE];
 	
 	uint8_t xr[BN8_SIZE];
-	uint8_t yr[BN8_SIZE];
+	uint8_t yr[BN8_SIZE];*/
 	
 	uint8_t a[BN8_SIZE];
 	uint8_t b[BN8_SIZE];
@@ -492,44 +561,11 @@ Point* point_double(Point *P, Curve *c_)
 	uint8_t r[BN8_SIZE+2];
 	uint8_t lambda[BN8_SIZE];
 	
-	if(P->at_infinity) return P;
+//!	if(P->at_infinity) return P;
 	
 	
-	// lambdaBN = (3x^2 + a)/2y
-	if (!BN_lshift1(tmp,P->y)) goto err; // 2yp		
-	//bn8_lshift1(tmp,P->y)
-	if (!BN_mod(tmp3, tmp, c_->p, ctx)) goto err; // 2yp mod p
-	//bn8_mod(tmp3, tmp, c_->p, ctx);
-	//if (!BN_mod_sqr(tmp2, P->x, c_->p, ctx)) goto err; // xp^2		
-	bn8_mod_mulP(tmp2, P->x, P->x, c_->p, ctx);
-	
-	if (!BN_mul_word(tmp2, 3)) goto err; // 3xp^2
-	if (!BN_mod(tmp, tmp2, c_->p, ctx)) goto err; // 3xp^2 mod p	
-	//if(!BN_mod_add(tmp2, tmp, c_->a, c_->p, ctx)) goto err; // 3xp^2+a
-	bn8_mod_add(tmp2, tmp, c_->a, c_->p, ctx);
-	//if (!BN_mod_inverse(tmp, tmp3, c_->p, ctx)) goto err; // (2yp)^-1
-	bn8_mod_inverse(tmp, tmp3, c_->p, ctx);
-	//if (!BN_mod_mul(lambdaBN, tmp2, tmp, c_->p, ctx)) goto err; // lambdaBN = (3xp^2+a)(2yp)^-1
-	bn8_mod_mulP(lambdaBN, tmp2, tmp, c_->p, ctx);
-	
-	// xr = lambdaBN^2 - 2x
-	if (!BN_mod_sqr(tmp, lambdaBN, c_->p, ctx)) goto err; // lambdaBN^2
-	if (!BN_lshift1(tmp2, P->x)) goto err; // 2xp
-	if (!BN_mod(tmp3, tmp2, c_->p, ctx)) goto err; // 2xp mod p
-	//if (!BN_mod_sub(xr, tmp, tmp3, c_->p, ctx)) goto err; // lambdaBN^2 - 2xp
-	bn8_mod_sub(xrBN, tmp, tmp3, c_->p, ctx);
-	
-	// yr = lambdaBN(x - xr) - y
-	//if (!BN_mod_sub(tmp, P->x, xr, c_->p, ctx)) goto err; // xp-xr
-	bn8_mod_sub(tmp, P->x, xrBN, c_->p, ctx);
-	//if (!BN_mod_mul(tmp2, lambdaBN, tmp, c_->p, ctx)) goto err; // lambdaBN(xp-xr)
-	bn8_mod_mulP(tmp2, lambdaBN, tmp, c_->p, ctx);
-	//if (!BN_mod_sub(yr, tmp2, P->y, c_->p, ctx)) goto err; // lambdaBN(xp-xr) - yp
-	bn8_mod_sub(yrBN, tmp2, P->y, c_->p, ctx);
-	
-	
-	bn8_from_bn(xp, P->x);
-	bn8_from_bn(yp, P->y);	
+	/*bn8_from_bn(xp, P->x);
+	bn8_from_bn(yp, P->y);	*/
 	
 	// lambda = (3x^2 + a)/2y
 	r[0]=0;
@@ -551,7 +587,7 @@ Point* point_double(Point *P, Curve *c_)
 	bn8_mul(dd, b, r+2, BN8_SIZE, BN8_SIZE); // lambda = (3xp^2+a)(2yp)^-1
 	bn8_barrett_reduction_p(r, dd);
 	bn8_copy(lambda, r+2, BN8_SIZE);
-	bn8_cmp_bn(lambda, BN8_SIZE, lambdaBN, 1);
+	
 	
 	// xr = lambda^2 - 2x	
 	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
@@ -563,18 +599,16 @@ Point* point_double(Point *P, Curve *c_)
 	bn8_mod(r, bn8_get_p(), BN8_SIZE+1);
 		
 	bn8_sub(xr, a, r+1); // lambda^2 - 2xp
-	bn8_cmp_bn(xr, BN8_SIZE, xrBN, 2);
 	
 	// yr = lambda(xp - xr) - yp
 	bn8_sub(a, xp, xr); // xp-xr			
 	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
 	bn8_barrett_reduction_p(r, dd);	
 	bn8_sub(yr, r+2, yp); // lambda(xp-xr) - yp
-	bn8_cmp_bn(yr, BN8_SIZE, yrBN, 3);
 	
-	BN_bin2bn(xr, BN8_SIZE, xrBN);
+	/*BN_bin2bn(xr, BN8_SIZE, xrBN);
 	BN_bin2bn(yr, BN8_SIZE, yrBN);	
-	return point_new(xrBN, yrBN);
+	return point_new(xrBN, yrBN);*/
 	
 	// BN helper implementation
 	/*
@@ -611,7 +645,7 @@ Point* point_double(Point *P, Curve *c_)
 	*/
 	err: return;	
 }
-
+/*
 Point* ec_point_mul_old(Point *P, BIGNUM *n, Curve *c)
 {
 	BIGNUM *lambda = BN_new();
@@ -684,4 +718,4 @@ Point* ec_point_mul_old(Point *P, BIGNUM *n, Curve *c)
 			return p2;
 		}
 	}
-}
+}*/

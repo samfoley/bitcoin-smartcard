@@ -1023,6 +1023,11 @@ bn8 bn8_get_p()
 	return MOD_P;
 }
 
+bn8 bn8_get_n()
+{
+	return MOD_N;
+}
+
 void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int i)
 {
 	BIGNUM *aBN = BN_new();
@@ -1032,4 +1037,10 @@ void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int i)
 		BN_print_fp(stdout, aBN); printf("\n");
 		BN_print_fp(stdout, b); printf("\n");
 	}
+}
+
+uint8_t bn8_is_bit_set(bn8 a, uint8_t i)
+{
+	uint8_t a_i = a[BN8_SIZE-i/BN8_WORD_SIZE-1];
+	return (a_i >> (i%BN8_WORD_SIZE)) & 0x01;
 }
