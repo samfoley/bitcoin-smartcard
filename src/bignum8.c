@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 #include "bignum8.h"
 
 
@@ -298,13 +299,10 @@ void bn8_mod(bn8 r, const bn8 mod, uint8_t size)
 // c and r 64 byte
 void bn8_fast_reduction(bn8 r, const bn8 c)
 {
-	uint8_t a[BN8_SIZE*2] = {0};
+	uint8_t a[BN8_SIZE*2] = {0};	
 	bn8 a0,a1;
 	bn8 c1 = c;
-	bn8 c0 = c + BN8_SIZE;
-	
-	while(bn8_cmp(c1, MOD_P) > 0)
-		bn8_subc(c1, 0, MOD_P);	
+	bn8 c0 = c + BN8_SIZE;	
 		
 	bn8_zero(a, BN8_SIZE*2);				
 	bn8_add_shift(a, c1, 32);	
@@ -313,16 +311,13 @@ void bn8_fast_reduction(bn8 r, const bn8 c)
 	bn8_add_shift(a, c1, 7);
 	bn8_add_shift(a, c1, 6);
 	bn8_add_shift(a, c1, 4);
-	bn8_add_shift(a, c1, 0);
-	
-	
-	
-	
+	bn8_add_shift(a, c1, 0);	
+		
 	a1 = a;
 	a0 = a+BN8_SIZE;
-		
+	
 	bn8_zero(r, BN8_SIZE*2);
-	bn8_add_shift(r, a1, 32);
+	bn8_add_shift(r, a1, 32);	
 	bn8_add_shift(r, a1, 9);
 	bn8_add_shift(r, a1, 8);
 	bn8_add_shift(r, a1, 7);
@@ -330,13 +325,10 @@ void bn8_fast_reduction(bn8 r, const bn8 c)
 	bn8_add_shift(r, a1, 4);
 	bn8_add_shift(r, a1, 0);
 	bn8_add_shift(r, a0, 0);
-	bn8_add_shift(r, c0, 0);
-		
-	bn8_zero(r, BN8_SIZE*2);		
+	bn8_add_shift(r, c0, 0);	
 	
 	while(bn8_cmp_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE) > 0)
-		bn8_sub_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE);	
-	
+		bn8_sub_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE);		
 }
 
 void bn8_barrett_reduction_p(bn8 r, const bn8 z)
@@ -429,7 +421,14 @@ void bn8_add_shift(bn8 r, const bn8 a, uint8_t n)
 		carry = (sum&0xff00) ? 1:0;
 		r[i+BN8_SIZE-offset] = sum&0xff;
 	}	
-	for(i=BN8_SIZE-offset-1; i; i--)
+	
+	sum = r[BN8_SIZE-offset-1]+carry;
+	carry = a[0]>>(BN8_WORD_SIZE-n);	
+	sum += carry;
+	carry = (sum&0xff00) ? 1:0;
+	r[BN8_SIZE-offset-1] = sum&0xff;
+	
+	for(i=BN8_SIZE-offset-2; i; i--)
 	{
 		sum = r[i]+carry;
 		carry = (sum&0xff00) ? 1:0;

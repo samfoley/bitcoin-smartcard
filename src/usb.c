@@ -88,6 +88,9 @@ int main(void)
 			printf("\n");
 		}
 		
+		// STATUS BLOCK
+		m24lr_write_block(0, 0);
+		
 		m24lr_write_block(2, bitcoin_satoshis);
 		unsigned char binary_address[25];
 		if(!_blkmk_b58tobin(binary_address, 25, bitcoin_address, 0))
@@ -114,6 +117,27 @@ int main(void)
 			block <<= 8*(3-i%4);
 			m24lr_write_block(3+i/4, block);
 		}
+		printf("\nWaiting for response\n");
+		while(1)
+		{
+			m24lr_read_block(0, &block);
+			switch(block>>24)
+			{
+				case BITCOIN_TRANSACTION_READY:
+					printf("Transaction ready\n"); break;
+				case BITCOIN_UNSPENT_READY:
+					printf("Unspent ready\n"); break;
+				case BITCOIN_PENDING:
+					printf("Transaction pending\n"); break;
+				case BITCOIN_COMPLETE:
+					printf("Transaction complete\n"); exit(1); break;
+				default:
+					printf("Unknown response %08x\n", block); break;
+			}
+			
+			usleep(100000);
+		}
+		
 		printf("\nReading address\n");
 		for(i=0; i<7; i++)
 		{

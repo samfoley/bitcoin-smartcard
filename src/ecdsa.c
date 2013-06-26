@@ -121,9 +121,11 @@ void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq)
 	uint8_t a[BN8_SIZE];
 	uint8_t b[BN8_SIZE];
 	uint8_t c[BN8_SIZE];
-	uint8_t dd[BN8_SIZE*2];
-	uint8_t r[BN8_SIZE+2];
+	uint8_t dd[BN8_SIZE*2];	
+	uint8_t rr[BN8_SIZE*2];	
 	uint8_t lambda[BN8_SIZE];	
+	
+	bn8 r = rr+BN8_SIZE;
 	
 	// lambda = (yq-yp)/(xq-xp)
 	bn8_sub(a, yq, yp); // yq-yp	
@@ -132,14 +134,14 @@ void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq)
 	bn8_invert(dd, b, bn8_get_p()); // (xq-xp)^-1
 	bn8_copy(c, dd+2, BN8_SIZE);
 	bn8_mul(dd, a, c, BN8_SIZE, BN8_SIZE); // (yq-yp)/(xq-xp)
-	bn8_barrett_reduction_p(r, dd);
-	bn8_copy(lambda, r+2, BN8_SIZE);
+	bn8_fast_reduction(rr, dd);
+	bn8_copy(lambda, r, BN8_SIZE);
 	
 	
 	// xr = lambda^2 - xp - xq
 	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
-	bn8_barrett_reduction_p(r, dd);
-	bn8_copy(a, r+2, BN8_SIZE);
+	bn8_fast_reduction(rr, dd);
+	bn8_copy(a, r, BN8_SIZE);
 	bn8_sub(b, a, xp); // lambda^2 - xp	
 	bn8_sub(xr, b, xq); // lambda^2 - xp - xq
 	
@@ -147,8 +149,8 @@ void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq)
 	// yr = lambda(xp - xr) - yp
 	bn8_sub(a, xp, xr); // xp - xr	
 	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
-	bn8_barrett_reduction_p(r, dd);
-	bn8_copy(b, r+2, BN8_SIZE);	
+	bn8_fast_reduction(rr, dd);
+	bn8_copy(b, r, BN8_SIZE);	
 	bn8_sub(yr, b, yp); // lambda(xp-xr) - yp				
 }
 
@@ -159,8 +161,10 @@ void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp)
 	uint8_t c[BN8_SIZE];
 	uint8_t dd[BN8_SIZE*2];
 	uint8_t r[BN8_SIZE+2];
+	uint8_t rr[BN8_SIZE*2];
 	uint8_t lambda[BN8_SIZE];
 	
+
 	
 	// lambda = (3x^2 + a)/2y
 	r[0]=0;
@@ -170,24 +174,24 @@ void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp)
 	bn8_copy(a, r+1, BN8_SIZE);
 	
 	bn8_mul(dd, xp, xp, BN8_SIZE, BN8_SIZE); // xp^2		
-	bn8_barrett_reduction_p(r, dd);		
+	bn8_fast_reduction(rr, dd);
 	
 	
-	bn8_mul3(dd, r+2, BN8_SIZE); // 3xp^2
+	bn8_mul3(dd, rr+BN8_SIZE, BN8_SIZE); // 3xp^2
 	bn8_mod(dd, bn8_get_p(), BN8_SIZE+1);
 	bn8_copy(b, dd+1, BN8_SIZE);
 	
 	bn8_invert(r, a, bn8_get_p()); // (2yp)^-1
 	
 	bn8_mul(dd, b, r+2, BN8_SIZE, BN8_SIZE); // lambda = (3xp^2+a)(2yp)^-1
-	bn8_barrett_reduction_p(r, dd);
-	bn8_copy(lambda, r+2, BN8_SIZE);
+	bn8_fast_reduction(rr, dd);
+	bn8_copy(lambda, rr+BN8_SIZE, BN8_SIZE);
 	
 	
 	// xr = lambda^2 - 2x	
 	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
-	bn8_barrett_reduction_p(r, dd);
-	bn8_copy(a, r+2, BN8_SIZE);
+	bn8_fast_reduction(rr, dd);
+	bn8_copy(a, rr+BN8_SIZE, BN8_SIZE);
 		
 	bn8_copy(r+1, xp, BN8_SIZE);
 	bn8_lshift1(r, BN8_SIZE+1); // 2xp
@@ -198,6 +202,6 @@ void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp)
 	// yr = lambda(xp - xr) - yp
 	bn8_sub(a, xp, xr); // xp-xr			
 	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
-	bn8_barrett_reduction_p(r, dd);	
-	bn8_sub(yr, r+2, yp); // lambda(xp-xr) - yp	
+	bn8_fast_reduction(rr, dd);
+	bn8_sub(yr, rr+BN8_SIZE, yp); // lambda(xp-xr) - yp	
 }
