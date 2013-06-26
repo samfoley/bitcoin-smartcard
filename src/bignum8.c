@@ -1,8 +1,6 @@
-#include <openssl/bn.h>
-#include <stdio.h>
 #include <stdint.h>
 #include "bignum8.h"
-#include <string.h>
+
 
 uint8_t t1[BN8_SIZE] = { 0 };
 uint8_t t2[BN8_SIZE] = { 0 };
@@ -21,25 +19,7 @@ uint8_t U0_N[17] = {0x01, 0x45, 0x51, 0x23, 0x19, 0x50, 0xb7, 0x5f, 0xc4, 0x40, 
 #define MOD_P (MOD_0000P+4)
 #define MOD_N (MOD_0000N+4)
 
-void bn8_to_bn(BIGNUM *r, const bn8 a)
-{
-	/*if(a[0] & 0x80)
-	{
-		bn8_negative(a);
-		BN_bin2bn(a, BN8_SIZE, r);
-		BN_set_negative(r,1);
-	} else		*/
-		BN_bin2bn(a, BN8_SIZE, r);
-}
 
-void bn8_from_bn(bn8 r, const BIGNUM *a)
-{
-	int n = BN_num_bytes(a);
-	memset(r, 0, BN8_SIZE);
-	BN_bn2bin(a, r+1+(BN8_SIZE-1)-n);
-	if(BN_is_negative(a))
-		bn8_negative(r);
-}
 
 void bn8_negative(bn8 r)
 {
@@ -183,14 +163,7 @@ void bn8_sub_acc(bn8 r, const bn8 a, uint8_t size)
 {
 	int i;
 	uint8_t carry, carry1;
-	uint16_t sum;
-	BIGNUM *rBN = BN_new();
-	BIGNUM *aBN = BN_new();
-	BIGNUM *raBN = BN_new();
-	BIGNUM *retBN = BN_new();
-	
-	BN_bin2bn(r, size, rBN);
-	BN_bin2bn(a, size, aBN);
+	uint16_t sum;	
 	
 	sum = r[size-1]-a[size-1];
 	carry = (sum&0xff00) ? 1:0;
@@ -203,16 +176,6 @@ void bn8_sub_acc(bn8 r, const bn8 a, uint8_t size)
 		carry = (sum&0xff00) ? 1:0;
 		r[i] = sum&0xff;
 	}	
-	BN_sub(raBN, rBN, aBN);
-	BN_bin2bn(r, size, retBN);
-	/*if(BN_cmp(raBN, retBN) != 0) {
-		
-		printf("sub_acc error %d %d %d\nr ", size, carry, carry1);
-		BN_print_fp(stdout, rBN); printf("\na ");
-		BN_print_fp(stdout, aBN); printf("\n");
-		BN_print_fp(stdout, raBN); printf("\n");
-		bn8_printn(r, size); printf("\n");
-	}*/
 }
 
 void bn8_subc(bn8 r, uint8_t c, const bn8 a)
@@ -311,25 +274,7 @@ void bn8_sub_nn(bn8 r, uint8_t size_r, const bn8 a, uint8_t size_a)
 	}
 }
 
-void bn8_print(const bn8 a)
-{
-	uint8_t i;
-	
-	for(i=0; i<BN8_SIZE; i++)
-	{
-		printf("%02x", a[i]);
-	}
-}
 
-void bn8_printn(const bn8 a, uint8_t n)
-{
-	uint8_t i;
-	
-	for(i=0; i<n; i++)
-	{
-		printf("%02x", a[i]);
-	}
-}
 void bn8_zero(bn8 r, uint8_t size)
 {
 	while(size)
@@ -353,14 +298,6 @@ void bn8_mod(bn8 r, const bn8 mod, uint8_t size)
 // c and r 64 byte
 void bn8_fast_reduction(bn8 r, const bn8 c)
 {
-	BIGNUM *rBN = BN_new();
-	BIGNUM *a0BN = BN_new();
-	BIGNUM *a1BN = BN_new();
-	BIGNUM *c0BN = BN_new();
-	BIGNUM *axBN = BN_new();
-	BIGNUM *pBN = BN_new();
-	BIGNUM *tmpBN = BN_new();
-	
 	uint8_t a[BN8_SIZE*2] = {0};
 	bn8 a0,a1;
 	bn8 c1 = c;
@@ -383,32 +320,7 @@ void bn8_fast_reduction(bn8 r, const bn8 c)
 	
 	a1 = a;
 	a0 = a+BN8_SIZE;
-	
-	BN_bin2bn(a1, 32, a1BN);
-	BN_bin2bn(a0, 32, a0BN);
-	BN_bin2bn(c0, 32, c0BN);
-	BN_bin2bn(MOD_P, 32, pBN);
-	
-	BN_zero(rBN);
-	//BN_add(rBN, rBN, a1BN);
-	BN_add(rBN, rBN, a0BN);
-	BN_add(rBN, rBN, c0BN);
-	BN_lshift(axBN, a1BN, 256);
-	BN_add(rBN, rBN, axBN);
-	/*
-	BN_lshift(axBN, a1BN, 32);
-	BN_add(rBN, rBN, axBN);
-	BN_lshift(axBN, a1BN, 9);
-	BN_add(rBN, rBN, axBN);
-	BN_lshift(axBN, a1BN, 8);
-	BN_add(rBN, rBN, axBN);
-	BN_lshift(axBN, a1BN, 7);
-	BN_add(rBN, rBN, axBN);
-	BN_lshift(axBN, a1BN, 6);
-	BN_add(rBN, rBN, axBN);
-	BN_lshift(axBN, a1BN, 4);
-	BN_add(rBN, rBN, axBN);
-	*/
+		
 	bn8_zero(r, BN8_SIZE*2);
 	bn8_add_shift(r, a1, 32);
 	bn8_add_shift(r, a1, 9);
@@ -419,25 +331,8 @@ void bn8_fast_reduction(bn8 r, const bn8 c)
 	bn8_add_shift(r, a1, 0);
 	bn8_add_shift(r, a0, 0);
 	bn8_add_shift(r, c0, 0);
-	
-	
-	
-	printf("\nbn ");
-	bn8_print(r);bn8_print(r+BN8_SIZE);
-	printf("\nBN ");
-	BN_print_fp(stdout, rBN);
-	printf("\n\n");
-	
-	/*while(BN_cmp(rBN, pBN) > 0)
-	{
-		BN_sub(tmpBN, rBN, pBN);
-		BN_copy(rBN, tmpBN);
-	}*/
-	
-	
-	bn8_zero(r, BN8_SIZE*2);
-	bn8_from_bn(r+BN8_SIZE, rBN);
-	return;
+		
+	bn8_zero(r, BN8_SIZE*2);		
 	
 	while(bn8_cmp_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE) > 0)
 		bn8_sub_nn(r, BN8_SIZE*2, MOD_P, BN8_SIZE);	
@@ -819,16 +714,7 @@ bn8 bn8_get_n()
 	return MOD_N;
 }
 
-void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int i)
-{
-	BIGNUM *aBN = BN_new();
-	BN_bin2bn(a, size, aBN);
-	if(BN_cmp(aBN, b) != 0) {
-		printf("cmp fail %d\n", i);
-		BN_print_fp(stdout, aBN); printf("\n");
-		BN_print_fp(stdout, b); printf("\n");
-	}
-}
+
 
 uint8_t bn8_is_bit_set(const bn8 a, uint8_t i)
 {

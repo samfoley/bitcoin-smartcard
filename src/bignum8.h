@@ -15,8 +15,6 @@ typedef uint8_t* bn8;
 
 		 
 // Integer operations
-void bn8_to_bn(BIGNUM *r, const bn8 a);
-void bn8_from_bn(bn8 r, const BIGNUM *a);
 void bn8_add(bn8 r, const bn8 a, const bn8 b);
 void bn8_add_n(bn8 r, const bn8 a, uint8_t n);
 void bn8_add_n32(bn8 r, const bn8 a, uint8_t n);
@@ -27,8 +25,7 @@ void bn8_sub_nn(bn8 r, uint8_t size_r, const bn8 a, uint8_t size_a);
 void bn8_subc(bn8 r, uint8_t c, const bn8 a);
 void bn8_sub_acc(bn8 r, const bn8 a, uint8_t size);
 void bn8_sub64(bn8 r, const bn8 a);
-void bn8_print(const bn8 a);
-void bn8_printn(const bn8 a, uint8_t n);
+
 void bn8_negative(bn8 r);
 void bn8_mod(bn8 r, const bn8 mod, uint8_t size);
 void bn8_fast_reduction(bn8 r, const bn8 a);
@@ -42,7 +39,6 @@ void bn8_invert(bn8 r, const bn8 a, const bn8 p);
 bn8 bn8_get_p();
 bn8 bn8_get_n();
 
-void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int message);
 
 signed char bn8_cmp(const bn8 a, const bn8 b);
 signed char bn8_cmp64(const bn8 a, const bn8 b);

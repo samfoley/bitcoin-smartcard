@@ -8,6 +8,7 @@
 
 #include "base58.h"
 #include "bignum8.h"
+#include "bn8_misc.h"
 
 uint8_t bn8_buffer_1[BN8_SIZE] = { 0 };
 uint8_t bn8_buffer_2[BN8_SIZE] = { 0 };
