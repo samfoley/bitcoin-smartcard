@@ -173,7 +173,7 @@ int main()
 	*/
 	dA_BN = BN_new();
 	_blkmk_b58tobin(priv_key_bin, sizeof(priv_key_bin), priv_key_b58, 0);
-	
+
 	BN_bin2bn(&priv_key_bin[1], 32, dA_BN);
 	
 	BN_hex2bn(&dA_BN, Da_hex);
@@ -243,8 +243,10 @@ int main()
                         32, sig,
                         siglen, eckey));
 
-						
-	ecdsa_test(m);
+	BN_hex2bn(&tmp, "1B22644A7BE026548810C378D0B2994EEFA6D2B9881803CB02CEFF865287D1B9");
+	bn8_from_bn(m, tmp);
+	ecdsa_test(m);		
+	
 	ecdsa_sign(r, s, digest);
 	
 	BN_bin2bn(r, BN8_SIZE, ecsig->r);
