@@ -21,7 +21,7 @@ uint8_t U0_N[17] = {0x01, 0x45, 0x51, 0x23, 0x19, 0x50, 0xb7, 0x5f, 0xc4, 0x40, 
 #define MOD_P (MOD_0000P+4)
 #define MOD_N (MOD_0000N+4)
 
-void bn8_to_bn(BIGNUM *r, bn8 a)
+void bn8_to_bn(BIGNUM *r, const bn8 a)
 {
 	/*if(a[0] & 0x80)
 	{
@@ -32,7 +32,7 @@ void bn8_to_bn(BIGNUM *r, bn8 a)
 		BN_bin2bn(a, BN8_SIZE, r);
 }
 
-void bn8_from_bn(bn8 r, BIGNUM *a)
+void bn8_from_bn(bn8 r, const BIGNUM *a)
 {
 	int n = BN_num_bytes(a);
 	memset(r, 0, BN8_SIZE);
@@ -48,186 +48,6 @@ void bn8_negative(bn8 r)
 	for(i=0; i<BN8_SIZE; i++)
 			r[i] = ~r[i];
 	bn8_add_word(r,1);
-}
-
-void bn8_mod_add(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
-         BN_CTX *ctx)
-{
-	BIGNUM *tmp = BN_new();
-	BIGNUM *tmp2 = BN_new();
-	
-	bn8_from_bn(t1, a);
-	bn8_from_bn(t2, b);
-	bn8_add(t3, t1, t2);
-	bn8_to_bn(ret, t3);
-	
-	BN_mod_add(tmp, a, b, m, ctx);
-	if(BN_cmp(tmp,ret)) {
-		printf("\n\nadd error \n");
-		bn8_print(t1); printf(" + \n");
-		bn8_print(t2); printf("\n");
-		BN_print_fp(stdout, a);printf(" + \n");
-		BN_print_fp(stdout, b);printf("\nt3=");
-		bn8_print(t3); printf("\nbn8=");
-		BN_print_fp(stdout, tmp);printf("\n BN=");
-		BN_print_fp(stdout, tmp2);printf("\n");
-	}
-	
-	BN_free(tmp);
-}
-
-void bn8_mod_sub(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
-         BN_CTX *ctx)
-{
-	uint8_t i;
-	BIGNUM *tmp = BN_new();
-	BIGNUM *tmp2 = BN_new();	
-	
-	bn8_from_bn(t1, a);
-	bn8_from_bn(t2, b);
-	bn8_sub(t3, t1, t2);
-	
-	bn8_to_bn(tmp, t3);		
-	
-	BN_mod_sub(tmp2, a, b, m, ctx);
-	
-	if(BN_cmp(tmp,tmp2)) {
-		printf("\n\nsub error \n");
-		bn8_print(t1); printf(" - \n");
-		bn8_print(t2); printf("\n");
-		BN_print_fp(stdout, a);printf(" - \n");
-		BN_print_fp(stdout, b);printf("\nt3=");
-		bn8_print(t3); printf("\nbn8=");
-		BN_print_fp(stdout, tmp);printf("\nBN=");
-		BN_print_fp(stdout, tmp2);printf("\n");
-	}
-	BN_nnmod(ret, tmp, m, ctx);
-	BN_free(tmp);
-}
-
-void bn8_mod_mulP(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
-         BN_CTX *ctx)
-{
-	uint8_t i;
-	BIGNUM *tmp = BN_new();
-	BIGNUM *tmp2 = BN_new();	
-	
-	bn8_from_bn(t1, a);
-	bn8_from_bn(t2, b);
-	bn8_mul(tmul, t1, t2, BN8_SIZE, BN8_SIZE);
-
-	bn8_barrett_reduction_p(tr, tmul);
-	
-	BN_bin2bn(tr, 34, tmp);
-	BN_bin2bn(tmul, 64, tmp2);
-	
-	//BN_mod_mul(ret, a, b, m, ctx);
-	//BN_mul(tmp2, a, b, ctx);
-	BN_nnmod(ret, tmp2, m, ctx);	
-	
-	if(BN_cmp(ret,tmp)) {
-		printf("\n\nmul mod p error \n");
-		bn8_print(t1); printf(" * \n");
-		bn8_print(t2); printf("\n");
-		BN_print_fp(stdout, a);printf(" * \n");
-		BN_print_fp(stdout, b);printf("\ntmul=");
-		bn8_print(tmul); bn8_print(tmul+BN8_SIZE); printf("\n\nbn8=");
-		BN_print_fp(stdout, tmp);printf("\nBN= ");
-		BN_print_fp(stdout, ret);printf("\n\n");
-	}
-	
-	BN_free(tmp);
-}
-
-void bn8_mod_mulN(BIGNUM *ret, BIGNUM *a, BIGNUM *b, const BIGNUM *m,
-         BN_CTX *ctx)
-{
-	uint8_t i;
-	BIGNUM *tmp = BN_new();
-	BIGNUM *tmp2 = BN_new();	
-	
-	bn8_from_bn(t1, a);
-	bn8_from_bn(t2, b);
-	bn8_mul(tmul, t1, t2, BN8_SIZE, BN8_SIZE);
-
-	bn8_barrett_reduction_n(tr, tmul);
-	
-	BN_bin2bn(tr, 34, tmp);
-	BN_bin2bn(tmul, 64, tmp2);
-	
-	//BN_mod_mul(ret, a, b, m, ctx);
-	//BN_mul(tmp2, a, b, ctx);
-	BN_nnmod(ret, tmp2, m, ctx);
-	BN_nnmod(tmp2, tmp, m, ctx);
-	
-	if(BN_cmp(ret,tmp2)) {
-		printf("\n\nmul mod n error \n");
-		bn8_print(t1); printf(" * \n");
-		bn8_print(t2); printf("\n");
-		BN_print_fp(stdout, a);printf(" * \n");
-		BN_print_fp(stdout, b);printf("\ntmul=");
-		bn8_print(tmul); bn8_print(tmul+BN8_SIZE); printf("\n\nbn8=");
-		BN_print_fp(stdout, tmp2);printf("\nBN= ");
-		BN_print_fp(stdout, ret);printf("\n\n");
-	}
-	
-	BN_free(tmp);
-}
-
-/*
-void bn8_nnmod(BIGNUM *r, const BIGNUM *a, const BIGNUM *m, BN_CTX *ctx)
-{
-	uint8_t i;
-	BIGNUM *tmp = BN_new();
-	BIGNUM *tmp2 = BN_new();	
-	
-	bn8_from_bn(t1, a);	
-	bn8_from_bn(t2, m);	
-	
-	bn8_fast_reduction(t3, t1);
-	
-	bn8_to_bn(tmp, t3);		
-	
-	BN_nnmod(r, a, m, ctx);
-	
-	if(BN_cmp(tmp,r)) {
-		printf("\n\nnnmod error \n");
-		bn8_print(t1); printf(" - \n");
-		bn8_print(t2); printf("\n");
-		BN_print_fp(stdout, a);printf(" - \n");
-		BN_print_fp(stdout, b);printf("\nt3=");
-		bn8_print(t3); printf("\nbn8=");
-		BN_print_fp(stdout, tmp);printf("\nBN=");
-		BN_print_fp(stdout, tmp2);printf("\n");
-	}	
-	BN_free(tmp);
-}*/
-
-void bn8_mod_inverse(BIGNUM *ret, BIGNUM *a, BIGNUM *mod, BN_CTX *ctx)
-{
-	uint8_t i;
-	BIGNUM *tmp = BN_new();
-	BIGNUM *tmp2 = BN_new();	
-	
-	bn8_from_bn(t1, a);
-	bn8_from_bn(t2, mod);
-	bn8_invert(tr, t1, t2);
-	
-	BN_bin2bn(tr, 34, ret);	
-	
-	BN_mod_inverse(tmp2, a, mod, ctx);
-	//BN_nnmod(ret, tmp, mod, ctx);
-	
-	if(BN_cmp(ret,tmp2)) {
-		printf("\n\ninverse error \n");
-		bn8_print(t1); printf(" - \n");
-		bn8_print(t2); printf("\n");
-		BN_print_fp(stdout, a);printf("\nt3=");
-		bn8_print(t3); printf("\nbn8=");
-		BN_print_fp(stdout, ret);printf("\nBN= ");
-		BN_print_fp(stdout, tmp2);printf("\n");
-	} 
-	BN_free(tmp);
 }
 
 void bn8_add(bn8 r, const bn8 a, const bn8 b)
@@ -297,7 +117,7 @@ void bn8_add_word(bn8 r, uint8_t a)
 // r = r+a
 // where r is n bytes 
 //       a is n-1 bytes
-void bn8_add_n(bn8 r, bn8 a, uint8_t n)
+void bn8_add_n(bn8 r, const bn8 a, uint8_t n)
 {
 	int i;
 	uint8_t carry;
@@ -316,7 +136,7 @@ void bn8_add_n(bn8 r, bn8 a, uint8_t n)
 	r[0] = r[0]+carry;
 }
 
-void bn8_add_n32(bn8 r, bn8 a, uint8_t n)
+void bn8_add_n32(bn8 r, const bn8 a, uint8_t n)
 {
 	int i;
 	uint8_t carry;
@@ -417,7 +237,7 @@ void bn8_subc(bn8 r, uint8_t c, const bn8 a)
 // where r is n bytes
 //       a is n-1 bytes
 // (assumes: result always positive)
-void bn8_sub_n(bn8 r, bn8 a, uint8_t n)
+void bn8_sub_n(bn8 r, const bn8 a, uint8_t n)
 {
 	int i;
 	uint8_t carry;
@@ -436,7 +256,7 @@ void bn8_sub_n(bn8 r, bn8 a, uint8_t n)
 	r[0] = r[0] - carry;	
 }
 
-void bn8_sub64(bn8 r, bn8 a)
+void bn8_sub64(bn8 r, const bn8 a)
 {
 	int i;
 	uint8_t carry;
@@ -464,7 +284,7 @@ void bn8_sub64(bn8 r, bn8 a)
 // r is size_r bytes
 // a is size_a bytes
 // size_a <= size_r
-void bn8_sub_nn(bn8 r, uint8_t size_r, bn8 a, uint8_t size_a)
+void bn8_sub_nn(bn8 r, uint8_t size_r, const bn8 a, uint8_t size_a)
 {
 	int i;
 	uint8_t carry;
@@ -523,7 +343,7 @@ void bn8_zero(bn8 r, uint8_t size)
 // r = r % mod
 // mod 32 bytes
 // r size bytes
-void bn8_mod(bn8 r, bn8 mod, uint8_t size)
+void bn8_mod(bn8 r, const bn8 mod, uint8_t size)
 {
 	while(bn8_cmp_nn(r, size, mod, BN8_SIZE) > 0)
 		bn8_sub_nn(r, size, mod, BN8_SIZE);	
@@ -531,7 +351,7 @@ void bn8_mod(bn8 r, bn8 mod, uint8_t size)
 
 // reduces c based on septk1256
 // c and r 64 byte
-void bn8_fast_reduction(bn8 r, bn8 c)
+void bn8_fast_reduction(bn8 r, const bn8 c)
 {
 	BIGNUM *rBN = BN_new();
 	BIGNUM *a0BN = BN_new();
@@ -624,7 +444,7 @@ void bn8_fast_reduction(bn8 r, bn8 c)
 	
 }
 
-void bn8_barrett_reduction_p(bn8 r, bn8 z)
+void bn8_barrett_reduction_p(bn8 r, const bn8 z)
 {
 	uint8_t i;
 	uint8_t q_[BN8_SIZE+1] = {0}; // 33 byte
@@ -655,7 +475,7 @@ void bn8_barrett_reduction_p(bn8 r, bn8 z)
 	}
 }
 
-void bn8_barrett_reduction_n(bn8 r, bn8 z)
+void bn8_barrett_reduction_n(bn8 r, const bn8 z)
 {
 	uint8_t i;
 	uint8_t q_[BN8_SIZE+1] = {0}; // 33 byte
@@ -689,7 +509,7 @@ void bn8_barrett_reduction_n(bn8 r, bn8 z)
 // r += a << n
 // r: 64 bytes
 // a: 32 bytes
-void bn8_add_shift(bn8 r, bn8 a, uint8_t n)
+void bn8_add_shift(bn8 r, const bn8 a, uint8_t n)
 {
 	uint8_t t;
 	uint8_t offset = n/BN8_WORD_SIZE;
@@ -790,7 +610,7 @@ void bn8_rshift1_2s(bn8 r, uint8_t size)
 		r[0] = r[0]>>1;
 }	
 
-void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t sizex, uint8_t sizey)
+void bn8_mul(bn8 r, const bn8 x, const bn8 y, uint8_t sizex, uint8_t sizey)
 {
 	int i,j;	
 	uint16_t uv=0;
@@ -814,7 +634,7 @@ void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t sizex, uint8_t sizey)
 
 // r = 3x
 // r is sizex+1 bytes
-void bn8_mul3(bn8 r, bn8 x, uint8_t sizex)
+void bn8_mul3(bn8 r, const bn8 x, uint8_t sizex)
 {
 	r[0] = 0;
 	bn8_copy(r+1, x, sizex);
@@ -822,36 +642,7 @@ void bn8_mul3(bn8 r, bn8 x, uint8_t sizex)
 	bn8_add_n(r, x, sizex+1);
 }
 
-/*
-void bn8_mul(bn8 r, bn8 x, bn8 y, uint8_t size)
-{
-	if(size==1)
-	{
-		*r = *x * *y;
-	}
-	else
-	{
-		uint_8 l = size/2;
-		bn8 x0,x1,y0,y1;
-		x0 = x+l;
-		x1 = x;
-		y0 = y+l;
-		y1 = y;
-		
-		bn8_mul(x1y1, x1, y1, l);
-		bn8_add(t1, x0, x1);
-		bn8_add(t2, y0, y1);
-		bn8_mul(t1t2, t1, t2, l);
-		bn8_mul(x0y0, x0, y0, l);
-		
-		bn8_add(t3, x1y1, x0y0);
-		bn8_sub(t4, t1t2, t3);
-		bn8_lshift(t4, l);
-		bn8_lshift(x1y1, 2*l);
-		bn8_add(t5, x1y1, t4);
-		bn8_add(r, t5, x0y0);
-	}
-}*/
+
 uint8_t bn8_is_even_2s(bn8 a, uint8_t size)
 {
 	if(a[0] & 0x80) return (a[size-1] & 0x01);
@@ -874,7 +665,7 @@ uint8_t bn8_is_one(bn8 a, uint8_t size)
 	return a[size-1]==1;
 }
 
-void bn8_copy(bn8 r, bn8 a, uint8_t size)
+void bn8_copy(bn8 r, const bn8 a, uint8_t size)
 {
 	uint8_t i;
 	
@@ -884,7 +675,7 @@ void bn8_copy(bn8 r, bn8 a, uint8_t size)
 
 #define X_SIZE (BN8_SIZE*2)
 
-void bn8_invert(bn8 r, bn8 a, bn8 p)
+void bn8_invert(bn8 r, const bn8 a, const bn8 p)
 {
 	uint8_t u[BN8_SIZE];
 	uint8_t v[BN8_SIZE];
@@ -1039,7 +830,7 @@ void bn8_cmp_bn(bn8 a, uint8_t size, BIGNUM *b, int i)
 	}
 }
 
-uint8_t bn8_is_bit_set(bn8 a, uint8_t i)
+uint8_t bn8_is_bit_set(const bn8 a, uint8_t i)
 {
 	uint8_t a_i = a[BN8_SIZE-i/BN8_WORD_SIZE-1];
 	return (a_i >> (i%BN8_WORD_SIZE)) & 0x01;
