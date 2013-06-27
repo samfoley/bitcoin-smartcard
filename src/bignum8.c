@@ -483,7 +483,7 @@ void bn8_lshift1(bn8 r, uint8_t size)
 	for(i=0; i<size-1; i++)
 	{
 		carry = r[i+1]>>7;
-		r[i] = r[i]<<1 | carry;
+		r[i] = (r[i]<<1) | carry;
 	}
 	r[size-1] = r[size-1] << 1;
 }
@@ -524,6 +524,49 @@ void bn8_mul(bn8 r, const bn8 x, const bn8 y, uint8_t sizex, uint8_t sizey)
 		}
 		r[i]=((uv>>8) &0xff);
 	}
+}
+
+void bn8_sqr(bn8 r, const bn8 x, uint8_t size)
+{
+	int16_t i,j,k;
+	uint8_t r0 = 0;
+	uint8_t r1 = 0;
+	uint8_t r2 = 0;
+	uint16_t uv, sum;
+	uint8_t carry = 0;
+	
+	for(k=0; k < 2*size-1; k++)
+	{
+		j = (k >= size-1) ? size-1:k;
+		i = (k-j > 0) ? k-j:0;
+		
+		for(; i <= j; i++)
+		{			
+			uv = x[size-1-i]*x[size-1-j];
+			if(i < j)
+			{
+				carry = (uv >> 15) ? 1:0;
+				uv = uv<<1;
+				r2 += carry;
+			}
+			sum = r0 + uv&0xff;
+			carry = (sum>>8) ? 1:0;
+			r0 = sum&0xff;
+			
+			sum = r1 +(uv>>8) + carry;
+			carry = (sum>>8) ? 1:0;
+			r1 = sum&0xff;
+			
+			r2 += carry;
+			
+			j--;
+		}
+		r[size*2-1-k] = r0;
+		r0 = r1;
+		r1 = r2;
+		r2 = 0;
+	}
+	r[0] = r0;	
 }
 
 // r = 3x

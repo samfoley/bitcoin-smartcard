@@ -32,6 +32,7 @@ void bn8_fast_reduction(bn8 r, const bn8 a);
 void bn8_barrett_reduction_p(bn8 r, const bn8 a);
 void bn8_barrett_reduction_n(bn8 r, const bn8 a);
 void bn8_mul(bn8 r, const bn8 x, const bn8 y, uint8_t sizex, uint8_t sizey);
+void bn8_sqr(bn8 r, const bn8 x, uint8_t size);
 void bn8_mul3(bn8 r, const bn8 x, uint8_t sizex);
 void bn8_lshift(bn8 r, uint8_t n);
 void bn8_invert(bn8 r, const bn8 a, const bn8 p);

@@ -21,6 +21,15 @@ uint8_t RANDOM_NUMBER[BN8_SIZE] = {0x67, 0x54, 0xc2, 0xe3, 0x1d, 0x7d, 0x70, 0xd
 void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq);
 void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp);
 
+void point_add_jacobian(bn8 xr, bn8 yr, bn8 zr, bn8 xp, bn8 yp, bn8 zp, bn8 xq, bn8 yq, bn8 zq);
+void point_double_jacobian(bn8 xr, bn8 yr, bn8 zr, bn8 xp, bn8 yp, bn8 zp);
+
+void field_mul(bn8 r, bn8 a, bn8 b);
+void field_sqr(bn8 r, bn8 a);
+void field_double(bn8 r, bn8 a);
+void field_mul3(bn8 r, bn8 a);
+void field_lshift(bn8 r, bn8 a, uint8_t n);
+
 void ecdsa_test(bn8 m)
 {
 	uint8_t x1[BN8_SIZE];
@@ -56,7 +65,17 @@ void ecdsa_sign(bn8 r, bn8 s, bn8 z)
 	
 	
 	// 4. (x1,y1) = k * G			
+	ec_point_mul_jacobian(x1, y1, Gx, Gy, k);
+	
+	printf("Jacobian\n");
+	bn8_print(x1); printf("\n");
+	bn8_print(y1); printf("\n");
+	
 	ec_point_mul(x1, y1, Gx, Gy, k);
+	
+	printf("Affine\n");
+	bn8_print(x1); printf("\n");
+	bn8_print(y1); printf("\n");
 	
 	// 5. r = x1 (mod n)	
 	bn8_copy(r, x1, BN8_SIZE);
@@ -116,16 +135,76 @@ void ec_point_mul(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
 	bn8_copy(yr, yq, BN8_SIZE);
 }
 
+void ec_point_mul_jacobian(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
+{
+	uint8_t xq[BN8_SIZE] = {0};
+	uint8_t yq[BN8_SIZE] = {0};
+	uint8_t zq[BN8_SIZE] = {0};
+	uint8_t xp[BN8_SIZE];
+	uint8_t yp[BN8_SIZE];
+	uint8_t zp[BN8_SIZE] = {0};
+	uint8_t zr[BN8_SIZE];
+	uint8_t z_inverse[BN8_SIZE+2];
+	uint8_t z3[BN8_SIZE];
+	
+	zp[BN8_SIZE-1] = 1;
+	
+	// Q at infinity
+	xq[BN8_SIZE-1]=1;
+	yq[BN8_SIZE-1]=1;
+	zq[BN8_SIZE-1]=0;
+	uint8_t q_at_infinity = 1;
+	
+	int i = 0;
+	
+	bn8_copy(xp, xp_, BN8_SIZE);
+	bn8_copy(yp, yp_, BN8_SIZE);
+	
+	for(i=0; i<256; i++)
+	{
+		if(bn8_is_bit_set(k,i))
+		{
+			if(q_at_infinity)
+			{
+				bn8_copy(xq, xp, BN8_SIZE);
+				bn8_copy(yq, yp, BN8_SIZE);
+				bn8_copy(zq, zp, BN8_SIZE);
+				q_at_infinity=0;
+			} else {							
+				point_add_jacobian(xr, yr, zr, xq, yq, zq, xp, yp, zp);
+				bn8_copy(xq, xr, BN8_SIZE);
+				bn8_copy(yq, yr, BN8_SIZE);
+				bn8_copy(zq, zr, BN8_SIZE);
+			}
+		}		
+		point_double_jacobian(xr, yr, zr, xp, yp, zp);
+		bn8_copy(xp, xr, BN8_SIZE);
+		bn8_copy(yp, yr, BN8_SIZE);
+		bn8_copy(zp, zr, BN8_SIZE);
+	}
+	
+	bn8_print(xq); printf(" Xq\n");
+	bn8_print(yq); printf(" Yq\n");
+	bn8_print(zq); printf(" zq\n");
+	
+	bn8_invert(z_inverse, zq, p);
+	field_sqr(zr, z_inverse+2);
+	
+	field_mul(xr, xq, zr);
+	
+	field_mul(z3, zr, z_inverse+2);
+	
+	field_mul(yr, yq, z3);	
+}
+
+
 void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq)
 {
 	uint8_t a[BN8_SIZE];
 	uint8_t b[BN8_SIZE];
 	uint8_t c[BN8_SIZE];
 	uint8_t dd[BN8_SIZE*2];	
-	uint8_t rr[BN8_SIZE*2];	
-	uint8_t lambda[BN8_SIZE];	
-	
-	bn8 r = rr+BN8_SIZE;
+	uint8_t lambda[BN8_SIZE];
 	
 	// lambda = (yq-yp)/(xq-xp)
 	bn8_sub(a, yq, yp); // yq-yp	
@@ -133,24 +212,16 @@ void point_add(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 xq, bn8 yq)
 	
 	bn8_invert(dd, b, bn8_get_p()); // (xq-xp)^-1
 	bn8_copy(c, dd+2, BN8_SIZE);
-	bn8_mul(dd, a, c, BN8_SIZE, BN8_SIZE); // (yq-yp)/(xq-xp)
-	bn8_fast_reduction(rr, dd);
-	bn8_copy(lambda, r, BN8_SIZE);
-	
+	field_mul(lambda, a, c); // (yq-yp)/(xq-xp)		
 	
 	// xr = lambda^2 - xp - xq
-	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
-	bn8_fast_reduction(rr, dd);
-	bn8_copy(a, r, BN8_SIZE);
+	field_sqr(a, lambda); // lambda^2	
 	bn8_sub(b, a, xp); // lambda^2 - xp	
 	bn8_sub(xr, b, xq); // lambda^2 - xp - xq
-	
-	
+		
 	// yr = lambda(xp - xr) - yp
 	bn8_sub(a, xp, xr); // xp - xr	
-	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
-	bn8_fast_reduction(rr, dd);
-	bn8_copy(b, r, BN8_SIZE);	
+	field_mul(b, lambda, a); // lambda(xp-xr)	
 	bn8_sub(yr, b, yp); // lambda(xp-xr) - yp				
 }
 
@@ -160,48 +231,172 @@ void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp)
 	uint8_t b[BN8_SIZE];
 	uint8_t c[BN8_SIZE];
 	uint8_t dd[BN8_SIZE*2];
-	uint8_t r[BN8_SIZE+2];
-	uint8_t rr[BN8_SIZE*2];
+	uint8_t r[BN8_SIZE+2];	
 	uint8_t lambda[BN8_SIZE];
 	
-
 	
-	// lambda = (3x^2 + a)/2y
-	r[0]=0;
-	bn8_copy(r+1, yp, BN8_SIZE);
-	bn8_lshift1(r, BN8_SIZE+1); // 2yp		
-	bn8_mod(r, bn8_get_p(), BN8_SIZE+1);
-	bn8_copy(a, r+1, BN8_SIZE);
-	
-	bn8_mul(dd, xp, xp, BN8_SIZE, BN8_SIZE); // xp^2		
-	bn8_fast_reduction(rr, dd);
-	
-	
-	bn8_mul3(dd, rr+BN8_SIZE, BN8_SIZE); // 3xp^2
-	bn8_mod(dd, bn8_get_p(), BN8_SIZE+1);
-	bn8_copy(b, dd+1, BN8_SIZE);
-	
-	bn8_invert(r, a, bn8_get_p()); // (2yp)^-1
-	
-	bn8_mul(dd, b, r+2, BN8_SIZE, BN8_SIZE); // lambda = (3xp^2+a)(2yp)^-1
-	bn8_fast_reduction(rr, dd);
-	bn8_copy(lambda, rr+BN8_SIZE, BN8_SIZE);
-	
+	// lambda = (3x^2 + a)/2y		
+	field_double(a, yp); // 2yp			
+	field_sqr(c, xp); // xp^2					
+	field_mul3(b, c); // 3xp^2		
+	bn8_invert(r, a, bn8_get_p()); // (2yp)^-1	
+	field_mul(lambda, b, r+2); // lambda = (3xp^2+a)(2yp)^-1
 	
 	// xr = lambda^2 - 2x	
-	bn8_mul(dd, lambda, lambda, BN8_SIZE, BN8_SIZE); // lambda^2
-	bn8_fast_reduction(rr, dd);
-	bn8_copy(a, rr+BN8_SIZE, BN8_SIZE);
-		
-	bn8_copy(r+1, xp, BN8_SIZE);
-	bn8_lshift1(r, BN8_SIZE+1); // 2xp
-	bn8_mod(r, bn8_get_p(), BN8_SIZE+1);
-		
-	bn8_sub(xr, a, r+1); // lambda^2 - 2xp
+	field_sqr(a, lambda); // lambda^2				
+	field_double(b, xp); // 2xp	
+	bn8_sub(xr, a, b); // lambda^2 - 2xp
 	
 	// yr = lambda(xp - xr) - yp
 	bn8_sub(a, xp, xr); // xp-xr			
-	bn8_mul(dd, lambda, a, BN8_SIZE, BN8_SIZE); // lambda(xp-xr)
-	bn8_fast_reduction(rr, dd);
-	bn8_sub(yr, rr+BN8_SIZE, yp); // lambda(xp-xr) - yp	
+	field_mul(c, lambda, a); // lambda(xp-xr)	
+	bn8_sub(yr, c, yp); // lambda(xp-xr) - yp	
+}
+
+void point_add_jacobian(bn8 Xr, bn8 Yr, bn8 Zr, bn8 Xp, bn8 Yp, bn8 Zp, bn8 Xq, bn8 Yq, bn8 Zq)
+{
+	uint8_t A[BN8_SIZE];
+	uint8_t B[BN8_SIZE];
+	uint8_t C[BN8_SIZE];
+	uint8_t D[BN8_SIZE];
+	uint8_t E[BN8_SIZE];
+	uint8_t F[BN8_SIZE];
+	uint8_t G[BN8_SIZE];
+	uint8_t H[BN8_SIZE];
+	uint8_t I[BN8_SIZE];
+	uint8_t t[BN8_SIZE];
+	uint8_t t2[BN8_SIZE];
+	
+	field_sqr(A, Zp);
+	
+	field_mul(B, Zp, A);
+	
+	field_mul(C, Xq, A);
+	
+	field_mul(D, Yq, B);
+	
+	bn8_sub(E, C, Xp);
+	
+	bn8_sub(F, D, Yp);
+	
+	field_sqr(G, E);
+	
+	field_mul(H, G, E);
+	
+	field_mul(I, Xp, G);
+	
+	field_double(t, I);
+	bn8_add(t2, H, t);
+	field_sqr(t, F);
+	bn8_sub(Xr, t, t2);
+	
+	bn8_sub(t, I, Xr);
+	field_mul(t2, F, t);
+	field_mul(t, Yp, H);
+	bn8_sub(Yr, t2, t);
+	
+	field_mul(Zr, Zp, E);
+}
+
+void point_double_jacobian(bn8 xr, bn8 yr, bn8 zr, bn8 xp, bn8 yp, bn8 zp)
+{
+	uint8_t A[BN8_SIZE];
+	uint8_t B[BN8_SIZE];
+	uint8_t C[BN8_SIZE];
+	uint8_t D[BN8_SIZE];
+	uint8_t t[BN8_SIZE];
+	uint8_t t2[BN8_SIZE];
+	
+	field_sqr(A, yp);
+	
+	field_lshift(t, xp, 2);
+	field_mul(B, t, A);
+	
+	field_sqr(t, A);
+	field_lshift(C, t, 3);
+	
+	field_sqr(t, xp);
+	field_mul3(D, t);
+	
+	field_sqr(t, D);
+	field_double(t2, B);
+	bn8_sub(xr, t, t2);
+	
+	bn8_sub(t, B, xr);
+	field_mul(t2, D, t);
+	bn8_sub(yr, t2, C);
+	
+	field_double(t, yp);
+	field_mul(zr, t, zp);
+}
+
+void field_mul(bn8 r, bn8 a, bn8 b)
+{
+	uint8_t ab[BN8_SIZE*2];
+	uint8_t rr[BN8_SIZE*2];
+	
+	bn8_mul(ab, a, b, BN8_SIZE, BN8_SIZE);
+	bn8_fast_reduction(rr, ab);
+	
+	bn8_copy(r, rr+BN8_SIZE, BN8_SIZE);
+}
+
+void field_sqr(bn8 r, bn8 a)
+{
+	uint8_t aa[BN8_SIZE*2];
+	uint8_t aa2[BN8_SIZE*2];
+	uint8_t rr[BN8_SIZE*2];
+	
+	bn8_mul(aa, a, a, BN8_SIZE, BN8_SIZE);
+	/*
+	bn8_sqr(aa2, a, BN8_SIZE);	
+	if(bn8_cmp_n(aa, aa2, BN8_SIZE*2) != 0) {
+		bn8_printn(aa, BN8_SIZE*2); printf(" mul\n");
+		bn8_printn(aa2, BN8_SIZE*2); printf(" sqr\n");
+	}*/
+	bn8_fast_reduction(rr, aa);
+	
+	bn8_copy(r, rr+BN8_SIZE, BN8_SIZE);
+}
+
+void field_double(bn8 r, bn8 a)
+{
+	uint8_t rr[BN8_SIZE+1];
+	
+	if(a[0] & 0x80)
+	{
+		rr[0]=0;
+		bn8_copy(rr+1, a, BN8_SIZE);
+		bn8_lshift1(rr, BN8_SIZE+1);
+		bn8_mod(rr, p, BN8_SIZE+1);
+		bn8_copy(r, rr+1, BN8_SIZE);
+	} else {
+		bn8_copy(r, a, BN8_SIZE);
+		bn8_lshift1(r, BN8_SIZE);
+		bn8_mod(r, p, BN8_SIZE);
+	}
+}
+
+
+void field_mul3(bn8 r, bn8 a)
+{
+	uint8_t rr[BN8_SIZE+1];
+	
+	bn8_mul3(rr, a, BN8_SIZE);
+	bn8_mod(rr, p, BN8_SIZE+1);
+	bn8_copy(r, rr+1, BN8_SIZE);	
+}
+
+void field_lshift(bn8 r, bn8 a, uint8_t n)
+{
+	uint8_t rr[BN8_SIZE+1];	
+	rr[0] = 0;
+	bn8_copy(rr+1, a, BN8_SIZE);
+	while(n)
+	{
+		bn8_lshift1(rr, BN8_SIZE+1); // TODO: lshift_n implementation
+		n--;
+	}	
+	bn8_mod(rr, p, BN8_SIZE+1);
+	bn8_copy(r, rr+1, BN8_SIZE);	
 }
