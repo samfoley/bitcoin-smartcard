@@ -2,6 +2,7 @@
 #include <openssl/bn.h>
 
 #include "bignum8.h"
+#include "bn8_misc.h"
 #include "ecdsa.h"
 
 
@@ -52,41 +53,24 @@ void ecdsa_sign(bn8 r, bn8 s, bn8 z)
 	uint8_t tmp[BN8_SIZE+2] = {0};
 	uint8_t tmp2[BN8_SIZE+2] = {0};	
 	
-	// 1. ?
-		
+	// 1. ?		
 	
-	// 2. z = hash(M)			
-		
-		
+	// 2. z = hash(M)							
 	
 	// 3. select random k from 0 to n-1
 	// TODO: random number generator
 	bn8_copy(k, RANDOM_NUMBER, BN8_SIZE);	
-	
-	
+		
 	// 4. (x1,y1) = k * G			
 	ec_point_mul_jacobian(x1, y1, Gx, Gy, k);
 	
-	printf("Jacobian\n");
-	bn8_print(x1); printf("\n");
-	bn8_print(y1); printf("\n");
-	
-	/*
-	ec_point_mul(x1, y1, Gx, Gy, k);
-	
-	printf("Affine\n");
-	bn8_print(x1); printf("\n");
-	bn8_print(y1); printf("\n");
-	*/
 	// 5. r = x1 (mod n)	
 	bn8_copy(r, x1, BN8_SIZE);
 	bn8_mod(r, bn8_get_n(), BN8_SIZE);
 	
 	// 6. s = k^-1(z + rdA) (mod n)	
 	bn8_mul(dd, r, dA, BN8_SIZE, BN8_SIZE); // r*dA
-	bn8_printn(r, BN8_SIZE); printf("r \n");
-	bn8_printn(dA, BN8_SIZE); printf(" dA\n");
-	bn8_printn(dd, BN8_SIZE*2); printf(" dd\n ");
+	
 	bn8_barrett_reduction_n(tmp, dd); // r*dA (mod n)
 	bn8_add_n(tmp+1, z, BN8_SIZE+1); // z + r*dA
 	bn8_mod(tmp+1, bn8_get_n(), BN8_SIZE+1); // (z + rdA) (mod n)
@@ -99,93 +83,6 @@ void ecdsa_sign(bn8 r, bn8 s, bn8 z)
 	bn8_copy(s, tmp+2, BN8_SIZE);
 }
 
-void ec_point_mul(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
-{
-	uint8_t xq[BN8_SIZE] = {0};
-	uint8_t yq[BN8_SIZE] = {0};
-	uint8_t xp[BN8_SIZE];
-	uint8_t yp[BN8_SIZE];
-	uint8_t q_at_infinity = 1;
-	
-	
-	uint8_t xJ1[BN8_SIZE] = {0};
-	uint8_t yJ1[BN8_SIZE] = {0};
-	uint8_t zJ1[BN8_SIZE] = {0};
-	
-	uint8_t xJ2[BN8_SIZE] = {0};
-	uint8_t yJ2[BN8_SIZE] = {0};
-	uint8_t zJ2[BN8_SIZE] = {0};
-	uint8_t zi[BN8_SIZE+2] = {0};
-	
-	int i = 0;
-	
-	bn8_copy(xp, xp_, BN8_SIZE);
-	bn8_copy(yp, yp_, BN8_SIZE);
-	
-	for(i=0; i<256; i++)
-	{
-		if(bn8_is_bit_set(k,i))
-		{
-			if(q_at_infinity)
-			{
-				bn8_copy(xq, xp, BN8_SIZE);
-				bn8_copy(yq, yp, BN8_SIZE);
-				q_at_infinity=0;
-			} else {							
-				point_add(xr, yr, xq, yq, xp, yp);
-				zJ1[BN8_SIZE-1] = 1;
-				point_add_jacobian(xJ2, yJ2, zJ2, xq, yq, zJ1, xp, yp, zJ1);	
-				bn8_copy(xq, xr, BN8_SIZE);
-				bn8_copy(yq, yr, BN8_SIZE);		
-
-
-				bn8_invert(zi, zJ2, p);
-				field_mul(xJ2, xJ2, zi+2);
-				field_mul(xJ2, xJ2, zi+2);
-				field_mul(yJ2, yJ2, zi+2);
-				field_mul(yJ2, yJ2, zi+2);
-				field_mul(yJ2, yJ2, zi+2);
-				
-				if(bn8_cmp(xJ2, xr) != 0 || bn8_cmp(yJ2, yr) != 0)
-				{
-					printf("Point add\n");
-					bn8_print(xp); printf(" xp\n");		
-					bn8_print(xJ2); printf(" xJ2\n");
-					bn8_print(yJ2); printf(" yJ2\n");
-					bn8_print(yp); printf(" yp\n");
-				}
-
-				
-			}
-		}		
-		
-		point_double(xr, yr, xp, yp);
-		zJ1[BN8_SIZE-1] = 1;
-		point_double_jacobian(xJ2, yJ2, zJ2, xp, yp, zJ1);		
-		bn8_copy(xp, xr, BN8_SIZE);
-		bn8_copy(yp, yr, BN8_SIZE);
-		
-								
-		bn8_invert(zi, zJ2, p);
-		field_mul(xJ2, xJ2, zi+2);
-		field_mul(xJ2, xJ2, zi+2);
-		field_mul(yJ2, yJ2, zi+2);
-		field_mul(yJ2, yJ2, zi+2);
-		field_mul(yJ2, yJ2, zi+2);
-		
-		if(bn8_cmp(xJ2, xr) != 0 || bn8_cmp(yJ2, yr) != 0)
-		{
-			printf("Point double\n");
-			bn8_print(xp); printf(" xp\n");		
-			bn8_print(xJ2); printf(" xJ2\n");
-			bn8_print(yJ2); printf(" yJ2\n");
-			bn8_print(yp); printf(" yp\n");
-		}
-	}
-	
-	bn8_copy(xr, xq, BN8_SIZE);
-	bn8_copy(yr, yq, BN8_SIZE);
-}
 
 void ec_point_mul_jacobian(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
 {
@@ -236,11 +133,7 @@ void ec_point_mul_jacobian(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
 			}
 		}		
 		
-	}
-	
-	bn8_print(xq); printf(" Xq\n");
-	bn8_print(yq); printf(" Yq\n");
-	bn8_print(zq); printf(" zq\n");
+	}		
 	
 	bn8_invert(z_inverse, zq, p);
 		
@@ -454,4 +347,93 @@ void field_lshift(bn8 r, bn8 a, uint8_t n)
 	}	
 	bn8_mod(rr, p, BN8_SIZE+1);
 	bn8_copy(r, rr+1, BN8_SIZE);	
+}
+
+// Affine Old implementation
+void ec_point_mul(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k)
+{
+	uint8_t xq[BN8_SIZE] = {0};
+	uint8_t yq[BN8_SIZE] = {0};
+	uint8_t xp[BN8_SIZE];
+	uint8_t yp[BN8_SIZE];
+	uint8_t q_at_infinity = 1;
+	
+	
+	uint8_t xJ1[BN8_SIZE] = {0};
+	uint8_t yJ1[BN8_SIZE] = {0};
+	uint8_t zJ1[BN8_SIZE] = {0};
+	
+	uint8_t xJ2[BN8_SIZE] = {0};
+	uint8_t yJ2[BN8_SIZE] = {0};
+	uint8_t zJ2[BN8_SIZE] = {0};
+	uint8_t zi[BN8_SIZE+2] = {0};
+	
+	int i = 0;
+	
+	bn8_copy(xp, xp_, BN8_SIZE);
+	bn8_copy(yp, yp_, BN8_SIZE);
+	
+	for(i=0; i<256; i++)
+	{
+		if(bn8_is_bit_set(k,i))
+		{
+			if(q_at_infinity)
+			{
+				bn8_copy(xq, xp, BN8_SIZE);
+				bn8_copy(yq, yp, BN8_SIZE);
+				q_at_infinity=0;
+			} else {							
+				point_add(xr, yr, xq, yq, xp, yp);
+				zJ1[BN8_SIZE-1] = 1;
+				point_add_jacobian(xJ2, yJ2, zJ2, xq, yq, zJ1, xp, yp, zJ1);	
+				bn8_copy(xq, xr, BN8_SIZE);
+				bn8_copy(yq, yr, BN8_SIZE);		
+
+
+				bn8_invert(zi, zJ2, p);
+				field_mul(xJ2, xJ2, zi+2);
+				field_mul(xJ2, xJ2, zi+2);
+				field_mul(yJ2, yJ2, zi+2);
+				field_mul(yJ2, yJ2, zi+2);
+				field_mul(yJ2, yJ2, zi+2);
+				
+				if(bn8_cmp(xJ2, xr) != 0 || bn8_cmp(yJ2, yr) != 0)
+				{
+					printf("Point add\n");
+					bn8_print(xp); printf(" xp\n");		
+					bn8_print(xJ2); printf(" xJ2\n");
+					bn8_print(yJ2); printf(" yJ2\n");
+					bn8_print(yp); printf(" yp\n");
+				}
+
+				
+			}
+		}		
+		
+		point_double(xr, yr, xp, yp);
+		zJ1[BN8_SIZE-1] = 1;
+		point_double_jacobian(xJ2, yJ2, zJ2, xp, yp, zJ1);		
+		bn8_copy(xp, xr, BN8_SIZE);
+		bn8_copy(yp, yr, BN8_SIZE);
+		
+								
+		bn8_invert(zi, zJ2, p);
+		field_mul(xJ2, xJ2, zi+2);
+		field_mul(xJ2, xJ2, zi+2);
+		field_mul(yJ2, yJ2, zi+2);
+		field_mul(yJ2, yJ2, zi+2);
+		field_mul(yJ2, yJ2, zi+2);
+		
+		if(bn8_cmp(xJ2, xr) != 0 || bn8_cmp(yJ2, yr) != 0)
+		{
+			printf("Point double\n");
+			bn8_print(xp); printf(" xp\n");		
+			bn8_print(xJ2); printf(" xJ2\n");
+			bn8_print(yJ2); printf(" yJ2\n");
+			bn8_print(yp); printf(" yp\n");
+		}
+	}
+	
+	bn8_copy(xr, xq, BN8_SIZE);
+	bn8_copy(yr, yq, BN8_SIZE);
 }

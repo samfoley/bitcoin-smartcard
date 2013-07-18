@@ -1,4 +1,4 @@
-all: usb test
+all: usb test bitcoin
 
 test:	test.c base58.h base58.o bignum8.o ecdsa.o bn8_misc.o
 	gcc -o test test.c base58.o bignum8.o ecdsa.o bn8_misc.o -lssl -pg -g
@@ -6,6 +6,9 @@ test:	test.c base58.h base58.o bignum8.o ecdsa.o bn8_misc.o
 usb: usb.c cr95hf.h cr95hf.o m24lr.o base58.o
 	gcc -o usb usb.c cr95hf.o m24lr.o base58.o -I /usr/local/lib/libusb-1.0.9/libusb/ -l usb-1.0
 
+bitcoin: bitcoin.c bitcoin.h ecdsa.o bignum8.o bn8_misc.o
+	gcc -o bitcoin bitcoin.c ecdsa.o bignum8.o bn8_misc.o -lssl -pg -g
+	
 cr95hf.o:	cr95hf.c cr95hf.h
 	gcc -c cr95hf.c -I /usr/local/lib/libusb-1.0.9/libusb/
 	
