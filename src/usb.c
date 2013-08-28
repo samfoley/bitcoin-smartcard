@@ -18,6 +18,8 @@
 const char bitcoin_address[] = "mwwdpwLoVr7BsCRyPqwyCCPGS93JenAZRS";
 int bitcoin_satoshis = 100000000;
 
+void start_tx();
+
 int main(void)
 {
 	libusb_device **devs;
@@ -52,75 +54,110 @@ int main(void)
 	} 
 	else
 	{
-		unsigned char UID[M24LR_UID_SIZE];
+		
 		
 		r = cr95hf_init(cr95hf);
 		if(r) return r;
 		
-		//cr95hf_idle();
-				
-		m24lr_inventory(UID);
-		printf("UID ");
+		start_tx();				
+	}
+	
+	libusb_free_device_list(devs, 1);
+}
+
+void start_tx()
+{
+	int errors, r,i=0;
+	unsigned char UID[M24LR_UID_SIZE];
+	
+	m24lr_inventory(UID);
+	usleep(100000);
+	printf("UID ");
+	for(i=0;i<M24LR_UID_SIZE; i++)
+			printf("%02x", UID[i]);
+	printf("\n");
+	
+	
+	printf("\nGet system info: \n");
+	M24LR_system_info info;
+	r = m24lr_get_system_info(UID, &info);
+	while(r)
+	{
+		usleep(10000);
+		printf("retrying\n");
+		r = m24lr_get_system_info(NULL, &info);
+	}
+		
+	if(r)
+		printf("get system info error %d\n", r);
+	else 
+	{
+		printf("flags %x DSFID %x AFI %x Memory size %x IC Ref %x UID ",
+			info.information_flags, info.DSFID, info.AFI,
+			info.memory_size, info.IC_ref);
 		for(i=0;i<M24LR_UID_SIZE; i++)
-				printf("%02x", UID[i]);
+			printf("%02x", info.UID[i]);
 		printf("\n");
-		
-		
-		printf("\nGet system info: \n");
-		M24LR_system_info info;
-		r = m24lr_get_system_info(UID, &info);
-		while(r)
+	}
+	
+	// STATUS BLOCK
+	while(r = m24lr_write_block(0, 0))
+	{
+		usleep(10000);
+		printf("retrying status\n");
+	}
+	
+	m24lr_write_block(2, bitcoin_satoshis);
+	unsigned char binary_address[25];
+	if(!_blkmk_b58tobin(binary_address, 25, bitcoin_address, 0))
+	{
+		fprintf(stderr,"Invalid Bitcoin address\n");
+		exit(-1);
+	}
+	unsigned int block=0;
+	
+	printf("Writing address\n");
+	for(i=0;i<25; i++)
+	{
+		printf("%02x", binary_address[i]);
+		block = (block<<8) + binary_address[i];
+		if(i%4==3)
 		{
-			usleep(10000);
-			printf("retrying\n");
-			r = m24lr_get_system_info(NULL, &info);
-		}
-			
-		if(r)
-			printf("get system info error %d\n", r);
-		else 
-		{
-			printf("flags %x DSFID %x AFI %x Memory size %x IC Ref %x UID ",
-				info.information_flags, info.DSFID, info.AFI,
-				info.memory_size, info.IC_ref);
-			for(i=0;i<M24LR_UID_SIZE; i++)
-				printf("%02x", info.UID[i]);
-			printf("\n");
-		}
-		
-		// STATUS BLOCK
-		m24lr_write_block(0, 0);
-		
-		m24lr_write_block(2, bitcoin_satoshis);
-		unsigned char binary_address[25];
-		if(!_blkmk_b58tobin(binary_address, 25, bitcoin_address, 0))
-		{
-			fprintf(stderr,"Invalid Bitcoin address\n");
-			exit(-1);
-		}
-		unsigned int block=0;
-		
-		printf("Writing address\n");
-		for(i=0;i<25; i++)
-		{
-			printf("%02x", binary_address[i]);
-			block = (block<<8) + binary_address[i];
-			if(i%4==3)
-			{
-				m24lr_write_block(3+i/4, block);
-				block = 0;
-			}
-		}
-		i--;
-		if(i%4!=3)
-		{
-			block <<= 8*(3-i%4);
 			m24lr_write_block(3+i/4, block);
+			block = 0;
 		}
-		printf("\nWaiting for response\n");
-		while(1)
+	}
+	i--;
+	if(i%4!=3)
+	{
+		block <<= 8*(3-i%4);
+		m24lr_write_block(3+i/4, block);
+	}
+	printf("\nWaiting for response\n");
+	errors=0;
+	while(1)
+	{
+		r = m24lr_read_block(0, &block);
+		if(r)
 		{
-			m24lr_read_block(0, &block);
+			if(errors>5) start_tx();
+			errors++;
+			
+			switch(r)
+			{
+				case 0x86:
+					printf("Communications error\n"); break;
+				case 0x87:
+					printf("Frame timeout error\n"); break;
+				case 0x88:
+					printf("Invalid SOF error\n"); break;
+				case 0x89:
+					printf("Buffer overflow error\n"); break;
+				default:
+					printf("0x%02x error\n", r);
+			}
+		} else {
+			errors=0;
 			switch(block>>24)
 			{
 				case BITCOIN_TRANSACTION_READY:
@@ -134,24 +171,23 @@ int main(void)
 				default:
 					printf("Unknown response %08x\n", block); break;
 			}
-			
-			usleep(100000);
 		}
+		fflush(stdout);
 		
-		printf("\nReading address\n");
-		for(i=0; i<7; i++)
-		{
-			if(m24lr_read_block(3+i, &block))
-			{
-				printf("____");
-			} else {
-				printf("%04x", block);
-			}
-		}
-		printf("\n");
+		usleep(100000);
 	}
 	
-	libusb_free_device_list(devs, 1);
+	printf("\nReading address\n");
+	for(i=0; i<7; i++)
+	{
+		if(m24lr_read_block(3+i, &block))
+		{
+			printf("____");
+		} else {
+			printf("%04x", block);
+		}
+	}
+	printf("\n");
 }
 
 #define POLYNOMIAL 0x8408// x^16 + x^12 + x^5 + 1

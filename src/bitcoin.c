@@ -13,12 +13,12 @@ uint64_t amount =   100000000; // 1 btc = 10e8 satoshis
 uint64_t balance  = 400000000; // current wallet balance
 
 uint8_t in1_tx_id[200] = {0x53, 0xd9, 0xd9, 0xdc, 0x25, 0xbd, 0x04, 0x92, 0x8c, 0xfe, 0xd1, 0x07, 0x0d, 0x51, 0x0e, 0xcc, 0xb3, 0x46, 0xe3, 0xa8, 0xb3, 0xaa, 0x8d, 0xaf, 0x21, 0x7a, 0xe4, 0xd1, 0x29, 0x36, 0x31, 0xcc};
-uint8_t in1_script[25] = {0x76, 0xa9, 0x14, 0x49, 0x4f, 0xcf, 0x55, 0xac, 0x4e, 0xfb, 0x77, 0xd2, 0x09, 0x85, 0x32, 0x51, 0x2f, 0x42, 0x8e, 0x25, 0x9f, 0x63, 0x42, 0x88, 0xac};
+uint8_t in1_script[225] = {0x76, 0xa9, 0x14, 0x49, 0x4f, 0xcf, 0x55, 0xac, 0x4e, 0xfb, 0x77, 0xd2, 0x09, 0x85, 0x32, 0x51, 0x2f, 0x42, 0x8e, 0x25, 0x9f, 0x63, 0x42, 0x88, 0xac};
 
 uint8_t in2_tx_id[200] = {0xe8, 0x0c, 0x2f, 0x8a, 0x6c, 0x6d, 0x1d, 0xcf, 0x8c, 0x26, 0xa4, 0x72, 0x92, 0x58, 0x5b, 0xd3, 0x55, 0x95, 0x4e, 0xd2, 0xaa, 0x39, 0xcc, 0x20, 0xbd, 0x4f, 0xa1, 0xfe, 0x3f, 0x8c, 0xf2, 0x6b};
-uint8_t in2_script[25] = {0x76, 0xa9, 0x14, 0x49, 0x4f, 0xcf, 0x55, 0xac, 0x4e, 0xfb, 0x77, 0xd2, 0x09, 0x85, 0x32, 0x51, 0x2f, 0x42, 0x8e, 0x25, 0x9f, 0x63, 0x42, 0x88, 0xac};
+uint8_t in2_script[225] = {0x76, 0xa9, 0x14, 0x49, 0x4f, 0xcf, 0x55, 0xac, 0x4e, 0xfb, 0x77, 0xd2, 0x09, 0x85, 0x32, 0x51, 0x2f, 0x42, 0x8e, 0x25, 0x9f, 0x63, 0x42, 0x88, 0xac};
 
-uint8_t public_key[32] = {0x08, 0xe8, 0xaf, 0x5e, 0x0c, 0x7d, 0x4d, 0x3f, 0x18, 0x40, 0x8d, 0x07, 0x3d, 0x3b, 0x2f, 0xb7, 0xe5, 0x4f, 0xc4, 0x4e, 0xec, 0x01, 0xcf, 0x43, 0x72, 0x43, 0xdc, 0x40, 0x6d, 0x4e, 0x3e, 0xad};
+uint8_t public_key[32] = {0x39, 0xA1, 0xE5, 0x74, 0xB4, 0x75, 0xBE, 0x52, 0x04, 0xF7, 0x8C, 0xB3, 0x72, 0x85, 0x4B, 0x4C, 0x85, 0x82, 0x20, 0xBD, 0xE4, 0x92, 0x09, 0x6C, 0x3A, 0xF1, 0xC5, 0xF1, 0xB6, 0x94, 0x4B, 0xC1};
 
 
 void write32(uint8_t *buffer, uint32_t data);
@@ -43,13 +43,13 @@ int main()
 	transaction.tx_in= transaction_inputs;
 	
 	transaction.tx_in[0].tx_id = in1_tx_id;
-	transaction.tx_in[0].index = 0;
+	transaction.tx_in[0].index = 1;
 	transaction.tx_in[0].script = in1_script;
 	transaction.tx_in[0].script_length = 25;
 	transaction.tx_in[0].sequence = BITCOIN_SEQUENCE;
 	
 	transaction.tx_in[1].tx_id = in2_tx_id;
-	transaction.tx_in[1].index = 1;
+	transaction.tx_in[1].index = 0;
 	transaction.tx_in[1].script = in2_script;
 	transaction.tx_in[1].script_length = 25;
 	transaction.tx_in[1].sequence = BITCOIN_SEQUENCE;
@@ -64,7 +64,7 @@ int main()
 	transaction.tx_out[0].script = malloc(25);
 	out = transaction.tx_out[0].script;
 	out[0] = 0x76; // OP_DUP
-	out[1] = 0x91; // OP_HASH_160
+	out[1] = 0xA9; // OP_HASH_160
 	out[2] = 0x14; // Push 20 bytes
 	for(i=0; i<20; i++)
 	{
@@ -79,7 +79,7 @@ int main()
 	transaction.tx_out[1].script = malloc(25);
 	out = transaction.tx_out[1].script;
 	out[0] = 0x76; // OP_DUP
-	out[1] = 0x91; // OP_HASH_160
+	out[1] = 0xA9; // OP_HASH_160
 	out[2] = 0x14; // Push 20 bytes
 	for(i=0; i<20; i++)
 	{
@@ -95,8 +95,7 @@ int main()
 	}
 	
 	// print hex tx
-	length = bitcoin_serialize(buffer, &transaction);
-	printf("\n");
+	length = bitcoin_serialize(buffer, &transaction);	
 	for(i=0; i<length; i++)
 	{
 		printf("%02x", buffer[i]);
@@ -122,7 +121,7 @@ void bitcoin_sign_input(bitcoin_tx *tx,  uint8_t index)
 		// txid
 		for(k=0; k < BITCOIN_TXID_LENGTH; k++)
 		{
-			tx_serialized[i++] = tx->tx_in[j].tx_id[k];
+			tx_serialized[i++] = tx->tx_in[j].tx_id[BITCOIN_TXID_LENGTH-1-k];
 		}
 		// index
 		write32(tx_serialized+i, tx->tx_in[j].index); i+= 4;
@@ -139,7 +138,7 @@ void bitcoin_sign_input(bitcoin_tx *tx,  uint8_t index)
 			tx_serialized[i++] = 0;
 		}
 		// sequence
-		write32(tx_serialized+i, tx->tx_in[j].sequence);
+		write32(tx_serialized+i, tx->tx_in[j].sequence);  i += 4;
 	}
 	
 	// out count
@@ -177,8 +176,7 @@ void bitcoin_sign_input(bitcoin_tx *tx,  uint8_t index)
 	// ECDSA sign
 	uint8_t r[32];
 	uint8_t s[32];
-	ecdsa_sign(r, s, hash);
-	printf("%d\n", index);
+	ecdsa_sign(r, s, hash);	
 	
 	// DER encode signature
 	uint8_t script_sig[200];
@@ -216,6 +214,9 @@ void bitcoin_sign_input(bitcoin_tx *tx,  uint8_t index)
 	{
 		script_sig[i++] = s[j];
 	}
+	// Hash type
+	script_sig[i++] = BITCOIN_SIGHASH_ALL;
+	
 	script_sig[bytes_to_push] = i-bytes_to_push-1;
 	
 	// public key
@@ -251,11 +252,11 @@ uint16_t bitcoin_serialize(uint8_t *tx_serialized, bitcoin_tx *tx)
 		// txid
 		for(k=0; k < BITCOIN_TXID_LENGTH; k++)
 		{
-			tx_serialized[i++] = tx->tx_in[j].tx_id[k];
+			tx_serialized[i++] = tx->tx_in[j].tx_id[BITCOIN_TXID_LENGTH-1-k];
 		}
 		// index
 		write32(tx_serialized+i, tx->tx_in[j].index); i+= 4;		
-		// sign input
+		// script length
 		tx_serialized[i++] = tx->tx_in[j].script_length;
 		for(k=0; k < tx->tx_in[j].script_length; k++)
 		{
@@ -263,7 +264,7 @@ uint16_t bitcoin_serialize(uint8_t *tx_serialized, bitcoin_tx *tx)
 		}
 		
 		// sequence
-		write32(tx_serialized+i, tx->tx_in[j].sequence);
+		write32(tx_serialized+i, tx->tx_in[j].sequence); i += 4;
 	}
 	
 	// out count

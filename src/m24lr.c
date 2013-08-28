@@ -26,6 +26,7 @@ int m24lr_inventory(unsigned char *uid)
 	do {
 		r = cr95hf_sendrecv(request, 3, response, CR95HF_BUFFER_SIZE); 
 		printf("Waiting for tag\n");
+		fflush(stdout);
 		usleep(50000);
 	} while(m24lr_error(response));
 	
@@ -179,7 +180,7 @@ int m24lr_error(unsigned char *response)
 	}
 	if(response[1] != CR95HF_OK)
 	{
-		// CR95HF error		
+		// CR95HF error				
 		return response[1];
 	}
 	

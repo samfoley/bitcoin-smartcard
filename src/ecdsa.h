@@ -5,5 +5,7 @@ void ecdsa_test(bn8 m);
 void ecdsa_sign(bn8 r, bn8 s, bn8 z);
 void ec_point_mul(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k);
 void ec_point_mul_jacobian(bn8 xr, bn8 yr, bn8 xp_, bn8 yp_, bn8 k);
+void ecdsa_set_private_key(bn8 key);
+void ecdsa_get_public_key(bn8 key);
 
 #endif
