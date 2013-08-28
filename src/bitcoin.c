@@ -4,7 +4,7 @@
 #include <openssl/sha.h>
 
 #include "bitcoin.h"
-#include "bignum8.h"
+#include "bignum32.h"
 #include "ecdsa.h"
 
 uint8_t to_address[200] = {0xb4, 0x2c, 0xfe, 0xe4, 0x7e, 0x6c, 0xaf, 0xb6, 0x7c, 0xff, 0x40, 0x6a, 0xb7, 0x8c, 0x7d, 0xa4, 0xd0, 0x55, 0x9f, 0x35};
@@ -111,6 +111,9 @@ void bitcoin_sign_input(bitcoin_tx *tx,  uint8_t index)
 	uint8_t j = 0;
 	uint8_t k = 0;
 	
+	uint8_t r[32];
+	uint8_t s[32];
+	
 	// version
 	write32(tx_serialized+i, tx->version); i+= 4;
 	// in count
@@ -173,9 +176,7 @@ void bitcoin_sign_input(bitcoin_tx *tx,  uint8_t index)
     SHA256_Update(&sha256, hash, SHA256_DIGEST_LENGTH);
     SHA256_Final(hash, &sha256);
 	
-	// ECDSA sign
-	uint8_t r[32];
-	uint8_t s[32];
+	// ECDSA sign	
 	ecdsa_sign(r, s, hash);	
 	
 	// DER encode signature

@@ -264,12 +264,8 @@ int main()
 	
 	ecdsa_test(m);		
 	
-	bn32_from_bin(digest_bn, digest);
+	ecdsa_sign(r, s, digest);
 	
-	ecdsa_sign(r_bn, s_bn, digest_bn);
-	
-	bn32_to_bin(r, r_bn);
-	bn32_to_bin(s, s_bn);
 	
 	BN_bin2bn(r, 32, ecsig->r);
 	BN_bin2bn(s, 32, ecsig->s);

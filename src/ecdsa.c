@@ -50,9 +50,11 @@ void ecdsa_test(bn32 m)
 	bn32_print(y1);printf("\n");
 }
 
-void ecdsa_sign(bn32 r, bn32 s, bn32 z)
+void ecdsa_sign(uint8_t *r_, uint8_t *s_, uint8_t *hash)
 {
-	
+	uint32_t r[BN32_SIZE];
+	uint32_t s[BN32_SIZE];
+	uint32_t z[BN32_SIZE];
 	uint32_t x1[BN32_SIZE];
 	uint32_t y1[BN32_SIZE];
 	uint32_t k[BN32_SIZE] = {0};	
@@ -61,7 +63,8 @@ void ecdsa_sign(bn32 r, bn32 s, bn32 z)
 	uint32_t tmp[BN32_SIZE+2] = {0};
 	uint32_t tmp2[BN32_SIZE+2] = {0};	
 	
-	// 1. ?		
+	// 1. Convert to bignum		
+	bn32_from_bin(z, hash);
 	
 	// 2. z = hash(M)							
 	
@@ -89,6 +92,9 @@ void ecdsa_sign(bn32 r, bn32 s, bn32 z)
 	bn32_barrett_reduction_n(tmp, dd);
 
 	bn32_copy(s, tmp+2, BN32_SIZE);
+	
+	bn32_to_bin(r_, r);
+	bn32_to_bin(s_, s);
 }
 
 void ecdsa_set_private_key(bn32 key)
