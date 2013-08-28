@@ -56,3 +56,13 @@ void bn8_printn(const bn8 a, uint8_t n)
 		printf("%02x", a[i]);
 	}
 }
+
+void bn32_print(const uint32_t* a)
+{
+	uint8_t i;
+	
+	for(i=0; i<8; i++)
+	{
+		printf("%08x", a[i]);
+	}
+}

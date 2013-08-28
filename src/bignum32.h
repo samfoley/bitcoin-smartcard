@@ -10,11 +10,13 @@ operations over 256bit integers
 
 #define BN32_SIZE 8
 #define BN32_WORD_SIZE 32
+#define BN32_BYTES 32
+#define BN32_MAX 0xffffffff
 
 typedef uint32_t* bn32;
 
 void bn32_to_bin(uint8_t *r, const bn32 b);
-void bn32_from_bin(bn32 *r, uint8_t *b);
+void bn32_from_bin(bn32 r, uint8_t *b);
 		 
 // Integer operations
 void bn32_add(bn32 r, const bn32 a, const bn32 b);
