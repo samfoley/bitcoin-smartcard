@@ -54,6 +54,9 @@ int main()
 	bn32_from_bin(b, b8);
 	bn32_print(a); printf("\n");
 	bn32_print(b); printf("\n");
+	
+	bn32_add(c, a, b);
+	bn32_print(c); printf("\n");
 }
 
 // converts bn32 to network ordered byte stream
