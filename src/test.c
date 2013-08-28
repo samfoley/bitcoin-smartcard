@@ -7,14 +7,15 @@
 #include <stdint.h>
 
 #include "base58.h"
-#include "bignum8.h"
-#include "bn8_misc.h"
+#include "bignum32.h"
+#include "ecdsa.h"
 
-uint8_t bn8_buffer_1[BN8_SIZE] = { 0 };
-uint8_t bn8_buffer_2[BN8_SIZE] = { 0 };
-uint8_t bn8_buffer_3[BN8_SIZE] = { 0 };
-uint8_t bn8_buffer_4[BN8_SIZE] = { 0 };
-uint8_t bn8_buffer_r[BN8_SIZE*2] = { 0 };
+
+uint32_t bn32_buffer_1[BN32_SIZE] = { 0 };
+uint32_t bn32_buffer_2[BN32_SIZE] = { 0 };
+uint32_t bn32_buffer_3[BN32_SIZE] = { 0 };
+uint32_t bn32_buffer_4[BN32_SIZE] = { 0 };
+uint32_t bn32_buffer_r[BN32_SIZE*2] = { 0 };
 
 const char priv_key_b58[] = "cSoZxDuKeR2TWRyQp8ZXAgPogL281Y786ZogzfmK13c1RBNRcmYS";
 
@@ -51,9 +52,9 @@ ECDSA_SIG* ECDSA_test_sign(unsigned char *digest, int digest_len, unsigned char 
 Point* point_new(BIGNUM *x, BIGNUM *y);
 Point* point_at_infinity();
 
-void ec_point_mul(bn8 xr, bn8 yr, bn8 xp, bn8 yp, bn8 k);
-void point_double(bn8 xr, bn8 yr, bn8 xp, bn8 yp);
-void point_add(bn8 xr, bn8 y, bn8 xp, bn8 yp, bn8 xq, bn8 yq);
+void ec_point_mul(bn32 xr, bn32 yr, bn32 xp, bn32 yp, bn32 k);
+void point_double(bn32 xr, bn32 yr, bn32 xp, bn32 yp);
+void point_add(bn32 xr, bn32 y, bn32 xp, bn32 yp, bn32 xq, bn32 yq);
 
 void print_bn(BIGNUM *b)
 {
@@ -80,9 +81,13 @@ int main()
 	BIGNUM *tmp = BN_new();
 	
 	
-	uint8_t r[BN8_SIZE];
-	uint8_t s[BN8_SIZE];
-	uint8_t m[BN8_SIZE] = {0xAA, 0x5E, 0x28, 0xD6, 0xA9, 0x7A, 0x24, 0x79, 0xA6, 0x55, 0x27, 0xF7, 0x29, 0x03, 0x11, 0xA3, 0x62, 0x4D, 0x4C, 0xC0, 0xFA, 0x15, 0x78, 0x59, 0x8E, 0xE3, 0xC2, 0x61, 0x3B, 0xF9, 0x95, 0x22};
+	uint32_t digest_bn[BN32_SIZE];
+	uint32_t r_bn[BN32_SIZE];
+	uint32_t s_bn[BN32_SIZE];
+	
+	uint8_t r[32];
+	uint8_t s[32];
+	uint32_t m[BN32_SIZE] = {0x1B22644A, 0x7BE02654, 0x8810C378, 0xD0B2994E, 0xEFA6D2B9, 0x881803CB, 0x02CEFF86, 0x5287D1B9};
 	
 	
 	if ((ctx = BN_CTX_new()) == NULL)
@@ -102,40 +107,40 @@ int main()
 	printf("u: ");
 	BN_print_fp(stdout, u);printf("\n");
 	
-	// test bn8_lshift
-	bn8_buffer_1[BN8_SIZE-1] = 0xff;
-	bn8_buffer_1[BN8_SIZE-1] = 0xba;
-	bn8_lshift(bn8_buffer_1, 9);
+	// test bn32_lshift
+	bn32_buffer_1[BN32_SIZE-1] = 0xff;
+	bn32_buffer_1[BN32_SIZE-1] = 0xba;
+	bn32_lshift(bn32_buffer_1, 9);
 	printf("lshift ");
-	bn8_print(bn8_buffer_1);
+	bn32_print(bn32_buffer_1);
 	printf("\n\n");
-	bn8_buffer_1[BN8_SIZE-1] = 0x00;
+	bn32_buffer_1[BN32_SIZE-1] = 0x00;
 	
-	// test bn8_add_shift
+	// test bn32_add_shift
 	printf("addshift\n\n");
-	bn8_buffer_1[BN8_SIZE-1] = 1;
-	bn8_buffer_1[BN8_SIZE-2] = 0xab;
-	bn8_buffer_1[BN8_SIZE-3] = 0xff;
-	bn8_add_shift(bn8_buffer_r, bn8_buffer_1, 4);
-	bn8_add_shift(bn8_buffer_r, bn8_buffer_1, 32);
+	bn32_buffer_1[BN32_SIZE-1] = 1;
+	bn32_buffer_1[BN32_SIZE-2] = 0xab;
+	bn32_buffer_1[BN32_SIZE-3] = 0xff;
+	bn32_add_shift(bn32_buffer_r, bn32_buffer_1, 4);
+	bn32_add_shift(bn32_buffer_r, bn32_buffer_1, 32);
 	
-	bn8_buffer_2[BN8_SIZE-1] = 0xff;
-	bn8_add_shift(bn8_buffer_r, bn8_buffer_2, 0);
-	bn8_print(bn8_buffer_r); bn8_print(bn8_buffer_r+BN8_SIZE);
+	bn32_buffer_2[BN32_SIZE-1] = 0xff;
+	bn32_add_shift(bn32_buffer_r, bn32_buffer_2, 0);
+	bn32_print(bn32_buffer_r); bn32_print(bn32_buffer_r+BN32_SIZE);
 	printf("\n\n");
 	
 	// test rshift
-	bn8_print(bn8_buffer_1); printf("\nrshift\n");
-	bn8_rshift1(bn8_buffer_1, BN8_SIZE); 
-	bn8_print(bn8_buffer_1); printf("\n");
+	bn32_print(bn32_buffer_1); printf("\nrshift\n");
+	bn32_rshift1(bn32_buffer_1, BN32_SIZE); 
+	bn32_print(bn32_buffer_1); printf("\n");
 	// test rshift
 	printf("\nlshift\n");
-	bn8_lshift1(bn8_buffer_1, BN8_SIZE); 
-	bn8_print(bn8_buffer_1); printf("\n");
+	bn32_lshift1(bn32_buffer_1, BN32_SIZE); 
+	bn32_print(bn32_buffer_1); printf("\n");
 	// test 3x
 	printf("3x\n");
-	bn8_mul3(bn8_buffer_r, bn8_buffer_1, BN8_SIZE);
-	bn8_printn(bn8_buffer_r, BN8_SIZE+1); printf("\n");
+	bn32_mul3(bn32_buffer_r, bn32_buffer_1, BN32_SIZE);
+	bn32_printn(bn32_buffer_r, BN32_SIZE+1); printf("\n");
 	
 	// Point add/double tests
 	
@@ -255,15 +260,21 @@ int main()
                         32, sig,
                         siglen, eckey));
 
-	BN_hex2bn(&tmp, "1B22644A7BE026548810C378D0B2994EEFA6D2B9881803CB02CEFF865287D1B9");
-	bn8_from_bn(m, tmp);
+	
+	
 	ecdsa_test(m);		
 	
-	ecdsa_sign(r, s, digest);
+	bn32_from_bin(digest_bn, digest);
 	
-	BN_bin2bn(r, BN8_SIZE, ecsig->r);
-	BN_bin2bn(s, BN8_SIZE, ecsig->s);
+	ecdsa_sign(r_bn, s_bn, digest_bn);
 	
+	bn32_to_bin(r, r_bn);
+	bn32_to_bin(s, s_bn);
+	
+	BN_bin2bn(r, 32, ecsig->r);
+	BN_bin2bn(s, 32, ecsig->s);
+	BN_print_fp(stdout, ecsig->r); printf("\n");
+	BN_print_fp(stdout, ecsig->s); printf("\n");
 	printf("\n");
 	printf("Verify %d\n",  ECDSA_do_verify(digest,
                         32, ecsig, eckey));

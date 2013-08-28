@@ -17,6 +17,9 @@ typedef uint32_t* bn32;
 
 void bn32_to_bin(uint8_t *r, const bn32 b);
 void bn32_from_bin(bn32 r, uint8_t *b);
+void bn32_print(const uint32_t* a);
+
+void bn32_printn(const uint32_t* a, int n);
 		 
 // Integer operations
 void bn32_add(bn32 r, const bn32 a, const bn32 b);

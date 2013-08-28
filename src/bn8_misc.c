@@ -1,3 +1,6 @@
+#ifndef _BN8_MISC
+#define _BN8_MISC
+
 #include <openssl/bn.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -57,12 +60,4 @@ void bn8_printn(const bn8 a, uint8_t n)
 	}
 }
 
-void bn32_print(const uint32_t* a)
-{
-	uint8_t i;
-	
-	for(i=0; i<8; i++)
-	{
-		printf("%08x", a[i]);
-	}
-}
+#endif
