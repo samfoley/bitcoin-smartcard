@@ -89,7 +89,18 @@ int main()
 	{
 		fprintf(stderr,"BN_CTX fail\n");
         return -1;
-	}	
+	}
+
+	// calculate u
+	BIGNUM *b2k = BN_new();
+	BIGNUM *u = BN_new();
+	BIGNUM *n = BN_new();
+	BN_hex2bn(&n, n_hex);
+	BN_one(b2k);
+	BN_lshift(b2k, b2k, 512);
+	BN_div(u, NULL, b2k, n, ctx);
+	printf("u: ");
+	BN_print_fp(stdout, u);printf("\n");
 	
 	// test bn8_lshift
 	bn8_buffer_1[BN8_SIZE-1] = 0xff;

@@ -18,6 +18,7 @@ uint32_t MOD_0000N[BN32_SIZE+4] = {0x00000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFF
 uint32_t U0_P[2] = {0x01, 0x000003d1};
 uint32_t U0_N[5] = {0x01, 0x45512319, 0x50b75fc4, 0x402da173, 0x2fc9bec0};
 
+
 #define MOD_P (MOD_0000P+1)
 #define MOD_N (MOD_0000N+1)
 
@@ -32,31 +33,44 @@ void bn8_printn(const bn8 a, uint8_t n)
 	}
 }
 
-void bn32_print(const uint32_t* a)
+
+void bn32_printn(const uint32_t* a, int n)
 {
 	uint8_t i;
 	
-	for(i=0; i<8; i++)
+	for(i=0; i<n; i++)
 	{
 		printf("%08x", a[i]);
 	}
 }
+void bn32_print(const uint32_t* a){ bn32_printn(a,8); }
 
 int main()
 {
 	uint8_t a8[32] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41};
 	uint8_t b8[32] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE,0xFF,0xFF,0xFC,0x2F};
+	uint8_t c8[32] = {0};
+	
 	uint32_t a[BN32_SIZE] = {0};
 	uint32_t b[BN32_SIZE] = {0};
-	uint32_t c[BN32_SIZE] = {0};
+	uint32_t c[BN32_SIZE+2] = {0};
+	uint32_t d[BN32_SIZE*2] = {0xFFFFFFFF, 0xBFD25E8C, 0xD0364141, 0xBFD25E8C, 0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364141, 0xFFFFFFFF, 0xBFD25E8C, 0xD0364141, 0xBFD25E8C, 0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364141};
+	uint32_t dd[BN32_SIZE*2] = {0};
+	uint32_t one[BN32_SIZE] = {0};
+	one[BN32_SIZE-1] = 1;
+	
+	int i;
 	
 	bn32_from_bin(a, a8);
-	bn32_from_bin(b, b8);
-	bn32_print(a); printf("\n");
-	bn32_print(b); printf("\n");
+	bn32_from_bin(b, b8);	
 	
-	bn32_add(c, a, b);
-	bn32_print(c); printf("\n");
+	
+	bn32_printn(d, BN32_SIZE*2); printf("\n");
+	bn32_fast_reduction(dd, d); 
+	bn32_printn(dd, BN32_SIZE*2); printf("\n");
+	
+	
+	
 }
 
 // converts bn32 to network ordered byte stream
@@ -65,10 +79,10 @@ void bn32_to_bin(uint8_t *r, const bn32 b)
 	int i;	
 	for(i=0; i<BN32_SIZE; i++)
 	{
-		r[i*4 + 0] = b[i] & 0xff000000;
-		r[i*4 + 1] = b[i] & 0x00ff0000;
-		r[i*4 + 2] = b[i] & 0x0000ff00;
-		r[i*4 + 3] = b[i] & 0x000000ff;
+		r[i*4 + 0] = (b[i] & 0xff000000) >> 24;
+		r[i*4 + 1] = (b[i] & 0x00ff0000) >> 16;
+		r[i*4 + 2] = (b[i] & 0x0000ff00) >> 8;
+		r[i*4 + 3] = (b[i] & 0x000000ff) >> 0;
 	}
 }
 
@@ -101,15 +115,14 @@ void bn32_add(bn32 r, const bn32 a, const bn32 b)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = a[BN32_SIZE-1]+b[BN32_SIZE-1];
+	sum = (uint64_t) a[BN32_SIZE-1]+b[BN32_SIZE-1];
 	carry = sum>>BN32_WORD_SIZE;
 	r[BN32_SIZE-1] = sum&0xffffffff;
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{
-		sum = a[i]+b[i]+carry;
-		carry = sum>>BN32_WORD_SIZE;
-		
+		sum = (uint64_t) a[i]+b[i]+carry;
+		carry = sum>>BN32_WORD_SIZE;		
 		r[i] = sum&0xffffffff;
 	}		
 	if(i = bn32_cmpc(r, carry, MOD_P) > 0)	
@@ -125,13 +138,13 @@ void bn32_addc(bn32 r, const bn32 a)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[BN32_SIZE-1]+a[BN32_SIZE-1];
+	sum = (uint64_t) r[BN32_SIZE-1]+a[BN32_SIZE-1];
 	carry = sum>>BN32_WORD_SIZE;
 	r[BN32_SIZE-1] = sum&BN32_MAX;
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{
-		sum = r[i]+a[i]+carry;
+		sum = (uint64_t) r[i]+a[i]+carry;
 		carry = sum>>BN32_WORD_SIZE;
 		r[i] = sum&BN32_MAX;
 	}
@@ -143,13 +156,13 @@ void bn32_add_word(bn32 r, uint8_t a)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[BN32_SIZE-1]+a;
+	sum = (uint64_t) r[BN32_SIZE-1]+a;
 	carry = sum>>BN32_WORD_SIZE;
 	r[BN32_SIZE-1] = sum&BN32_MAX;
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{
-		sum = r[i]+carry;
+		sum = (uint64_t) r[i]+carry;
 		carry = sum>>BN32_WORD_SIZE;
 		r[i] = sum&BN32_MAX;
 		if(!carry) return;
@@ -169,78 +182,84 @@ void bn32_add_n(bn32 r, const bn32 a, uint8_t n)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[n-1]+a[n-2];
+	sum = (uint64_t) r[n-1]+a[n-2];
 	carry = sum>>BN32_WORD_SIZE;
 	r[n-1] = sum&BN32_MAX;
 	
 	for(i=n-2; i>0; i--)
 	{
-		sum = r[i]+a[i-1]+carry;
+		sum = (uint64_t) r[i]+a[i-1]+carry;
 		carry = sum>>BN32_WORD_SIZE;
 		r[i] = sum&BN32_MAX;
 	}
 	r[0] = r[0]+carry;
 }
 
+// r += a
+// where a is 32 bytes
+//       r is n bytes with n>32
 void bn32_add_n32(bn32 r, const bn32 a, uint8_t n)
 {
 	int i;
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[n-1]+a[BN32_SIZE-1];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[n-1]+a[BN32_SIZE-1];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[n-1] = sum&BN32_MAX;
 	
 	for(i=2; i<=BN32_SIZE; i++)
 	{
-		sum = r[n-i]+a[BN32_SIZE-i]+carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[n-i]+a[BN32_SIZE-i]+carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[n-i] = sum&BN32_MAX;
 	}
 	for(; i<n; i++)
 	{
-		sum = r[n-i]+carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[n-i]+carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[n-i] = sum&BN32_MAX;
 	}
 	r[0] = r[0]+carry;	
 }
+
 void bn32_sub(bn32 r, const bn32 a, const bn32 b)
 {
 	int i;
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = a[BN32_SIZE-1]-b[BN32_SIZE-1];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) a[BN32_SIZE-1]-b[BN32_SIZE-1];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	
 	r[BN32_SIZE-1] = sum&BN32_MAX;
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{
-		sum = a[i]-b[i]-carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) a[i]-b[i]-carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i] = sum&BN32_MAX;
 	}	
 	if(carry) bn32_addc(r, MOD_P);
 }
 
+// r -= a
+// where r,a is size
+//       
 void bn32_sub_acc(bn32 r, const bn32 a, uint8_t size)
 {
 	int i;
-	uint32_t carry, carry1;
+	uint32_t carry;
 	uint64_t sum;	
 	
-	sum = r[size-1]-a[size-1];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[size-1]-a[size-1];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[size-1] = sum&BN32_MAX;
 	
 	for(i=size-2; i>=0; i--)
 	{
-		sum = r[i]-a[i]-carry;
-		carry1 = carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[i]-a[i]-carry;		
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i] = sum&BN32_MAX;
 	}	
 }
@@ -251,15 +270,16 @@ void bn32_subc(bn32 r, uint8_t c, const bn32 a)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[BN32_SIZE-1]-a[BN32_SIZE-1];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[BN32_SIZE-1]-a[BN32_SIZE-1];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[BN32_SIZE-1] = sum&BN32_MAX;
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{
-		sum = r[i]-a[i]-carry;
-		carry = sum >> BN32_WORD_SIZE;
-		r[i] = sum&0xff;
+		sum = (uint64_t) r[i]-a[i]-carry;		
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
+		printf("%x\n", carry);
+		r[i] = sum & BN32_MAX;
 	}	
 }
 
@@ -273,14 +293,14 @@ void bn32_sub_n(bn32 r, const bn32 a, uint8_t n)
 	uint32_t carry;
 	uint64_t sum;	
 	
-	sum = r[n-1]-a[n-2];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[n-1]-a[n-2];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[n-1] = sum&BN32_MAX;
 	
 	for(i=n-2; i>0; i--)
 	{
-		sum = r[i]-a[i-1]-carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[i]-a[i-1]-carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i] = sum&BN32_MAX;
 	}	
 	r[0] = r[0] - carry;	
@@ -292,20 +312,20 @@ void bn32_sub64(bn32 r, const bn32 a)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[2*BN32_SIZE-1]-a[BN32_SIZE-1];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[2*BN32_SIZE-1]-a[BN32_SIZE-1];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[2*BN32_SIZE-1] = sum&BN32_MAX;
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{
-		sum = r[i+BN32_SIZE]-a[i]-carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[i+BN32_SIZE]-a[i]-carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i+BN32_SIZE] = sum&BN32_MAX;
 	}	
 	for(i=BN32_SIZE-1; i>=0; i--)
 	{
-		sum = r[i]-carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[i]-carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i] = sum&BN32_MAX;
 	}
 }
@@ -320,22 +340,22 @@ void bn32_sub_nn(bn32 r, uint8_t size_r, const bn32 a, uint8_t size_a)
 	uint32_t carry;
 	uint64_t sum;
 	
-	sum = r[size_r-1]-a[size_a-1];
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[size_r-1]-a[size_a-1];
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[size_r-1] = sum&BN32_MAX;
 	
 	for(i=size_a-2; i>=0; i--)
 	{
-		sum = r[i+size_r-size_a]-a[i]-carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[i+size_r-size_a]-a[i]-carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i+size_r-size_a] = sum&BN32_MAX;
 	}	
 	if(size_r-size_a)
 	{
 		for(i=size_r-size_a-1; i>=0; i--)
 		{
-			sum = r[i]-carry;
-			carry = sum >> BN32_WORD_SIZE;
+			sum = (uint64_t) r[i]-carry;
+			carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 			r[i] = sum&BN32_MAX;
 		}
 	}
@@ -402,7 +422,7 @@ void bn32_barrett_reduction_p(bn32 r, const bn32 z)
 	uint8_t i;
 	uint32_t q_[BN32_SIZE+1] = {0}; // 33 byte
 	uint32_t q_p[BN32_SIZE*2+1] = {0};
-	bn32_zero(r, BN32_SIZE+2);
+	bn32_zero(r, BN32_SIZE+1);
 	
 	bn32_mul(q_p, z, U0_P, BN32_SIZE+1, 2);
 	
@@ -417,14 +437,14 @@ void bn32_barrett_reduction_p(bn32 r, const bn32 z)
 	if(bn32_cmp_n(z+BN32_SIZE-1, q_p+BN32_SIZE, BN32_SIZE+1) < 0)	
 		r[0] = 1;	// Adds b^(k+1) if r would be negative
 	
-	for(i=0; i<BN32_SIZE+1; i++)	
-		r[1+i] = z[31+i];
+	for(i=0; i<BN32_SIZE; i++)	
+		r[1+i] = z[7+i];
 		
 	bn32_sub_n(r, q_p+BN32_SIZE, BN32_SIZE+2);
 	
-	while(bn32_cmp_nn(r, BN32_SIZE+2, MOD_P, BN32_SIZE) > 0)
+	while(bn32_cmp_nn(r, BN32_SIZE+1, MOD_P, BN32_SIZE) > 0)
 	{
-		bn32_sub_nn(r, BN32_SIZE+2, MOD_P, BN32_SIZE);
+		bn32_sub_nn(r, BN32_SIZE+1, MOD_P, BN32_SIZE);
 	}
 }
 
@@ -435,25 +455,27 @@ void bn32_barrett_reduction_n(bn32 r, const bn32 z)
 	uint32_t q_p[BN32_SIZE*2+1] = {0};
 	bn32_zero(r, BN32_SIZE+2);
 	
+	// the q_ multiplication is split into two parts q_ = z[16:7] + z[16:7]*u0 
+	// where u = 100.. + u0
 	bn32_mul(q_p, z, U0_N, BN32_SIZE+1, 5);
 	
 	
-	for(i=0; i<17; i++)
-		q_[BN32_SIZE-i] = q_p[16-i];
+	for(i=0; i<5; i++)
+		q_[BN32_SIZE-i] = q_p[4-i];
 	bn32_add_n(q_, z, BN32_SIZE+1);	
 	
 	
-	bn32_mul(q_p, q_, MOD_0000N+4, BN32_SIZE+1, BN32_SIZE); // todo: efficient 33 byte multiplication
+	bn32_mul(q_p, q_, MOD_0000N+1, BN32_SIZE+1, BN32_SIZE); // todo: efficient 33 byte multiplication
 	
 	if(bn32_cmp_n(z+BN32_SIZE-1, q_p+BN32_SIZE, BN32_SIZE+1) < 0)	
 		r[0] = 1;	// Adds b^(k+1) if r would be negative
 	
 	for(i=0; i<BN32_SIZE+1; i++)	
-		r[1+i] = z[31+i];
+		r[1+i] = z[7+i];
 		
 	bn32_sub_n(r, q_p+BN32_SIZE, BN32_SIZE+2);
 	
-	while(bn32_cmp_nn(r, BN32_SIZE+2, MOD_N, BN32_SIZE) > 0)
+	while(bn32_cmp_nn(r, BN32_SIZE+2, MOD_N, BN32_SIZE) >= 0) // TODO: zero detection
 	{
 		bn32_sub_nn(r, BN32_SIZE+2, MOD_N, BN32_SIZE);
 	}
@@ -464,7 +486,7 @@ void bn32_barrett_reduction_n(bn32 r, const bn32 z)
 // a: 32 bytes
 void bn32_add_shift(bn32 r, const bn32 a, uint8_t n)
 {
-	uint8_t t;
+	uint32_t t;
 	uint8_t offset = n/BN32_WORD_SIZE;
 	n %= BN32_WORD_SIZE;
 	
@@ -473,31 +495,31 @@ void bn32_add_shift(bn32 r, const bn32 a, uint8_t n)
 	uint64_t sum;
 	
 	t = (a[BN32_SIZE-1]<<n);
-	sum = r[BN32_SIZE*2-1-offset]+t;
-	carry = sum >> BN32_WORD_SIZE;
+	sum = (uint64_t) r[BN32_SIZE*2-1-offset]+t;
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[BN32_SIZE*2-1-offset] = sum&BN32_MAX;
 	
 	
 	for(i=BN32_SIZE-2; i>=0; i--)
 	{				
-		sum = r[i+BN32_SIZE-offset]+carry;
+		sum = (uint64_t) r[i+BN32_SIZE-offset]+carry;
 		carry = a[i+1]>>(BN32_WORD_SIZE-n);
 		t = a[i]<<n | carry;
 		sum += t;
-		carry = sum >> BN32_WORD_SIZE;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i+BN32_SIZE-offset] = sum&BN32_MAX;
 	}	
 	
-	sum = r[BN32_SIZE-offset-1]+carry;
+	sum = (uint64_t) r[BN32_SIZE-offset-1]+carry;
 	carry = a[0]>>(BN32_WORD_SIZE-n);	
 	sum += carry;
-	carry = sum >> BN32_WORD_SIZE;
+	carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 	r[BN32_SIZE-offset-1] = sum&BN32_MAX;
 	
 	for(i=BN32_SIZE-offset-2; i; i--)
 	{
-		sum = r[i]+carry;
-		carry = sum >> BN32_WORD_SIZE;
+		sum = (uint64_t) r[i]+carry;
+		carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 		r[i] = sum&BN32_MAX;
 	}
 	r[i] += carry;	
@@ -565,7 +587,7 @@ void bn32_rshift1_2s(bn32 r, uint8_t size)
 		r[i-1] = r[i-1]>>1 | carry;
 	}
 	if(r[0]&0x80000000)
-		r[0] = (r[0]>>1) | 0x80;
+		r[0] = (r[0]>>1) | 0x80000000;
 	else
 		r[0] = r[0]>>1;
 }	
@@ -585,10 +607,11 @@ void bn32_mul(bn32 r, const bn32 x, const bn32 y, uint8_t sizex, uint8_t sizey)
 		
 		for(j=sizey-1; j>=0; j--)
 		{
-			uv = r[i+j+1]+x[i]*y[j] + ((uv>>BN32_WORD_SIZE) & BN32_MAX);
+			uv = r[i+j+1]+(uint64_t)x[i]*y[j] + ((uv>>BN32_WORD_SIZE) & BN32_MAX) ;
 			r[i+j+1]=uv&BN32_MAX;
 		}
-		r[i]=((uv>>BN32_WORD_SIZE) &BN32_MAX);
+		r[i]=((uv>>BN32_WORD_SIZE) & BN32_MAX);
+		
 	}
 }
 
@@ -616,11 +639,11 @@ void bn32_sqr(bn32 r, const bn32 x, uint8_t size)
 				r2 += carry;
 			}
 			sum = r0 + uv&BN32_MAX;
-			carry = sum >> BN32_WORD_SIZE;
+			carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 			r0 = sum & BN32_MAX;
 			
 			sum = r1 +(uv>>8) + carry;
-			carry = sum >> BN32_WORD_SIZE;
+			carry = (sum >> BN32_WORD_SIZE) ? 1:0;
 			r1 = sum & BN32_MAX;
 			
 			r2 += carry;

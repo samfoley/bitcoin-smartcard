@@ -22,10 +22,10 @@ bignum8.o:	bignum8.c bignum8.h
 	gcc -c bignum8.c -pg -g
 
 bignum32.o: bignum32.c bignum32.h bn8_misc.h
-	gcc -c bignum32.c
+	gcc -c bignum32.c -g
 	
 bignum32: bignum32.o
-	gcc -o bignum32 bignum32.o
+	gcc -o bignum32 bignum32.o -g
 	
 ecdsa.o:	ecdsa.c ecdsa.h bignum8.h
 	gcc -c ecdsa.c -pg -g
