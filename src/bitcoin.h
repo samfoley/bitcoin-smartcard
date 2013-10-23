@@ -37,7 +37,7 @@ struct tx_out
 	uint8_t *script;
 };
 
-uint8_t bitcoin_transaction(uint8_t address[], uint64_t amount);
+uint8_t bitcoin_transaction(char *filename, char *output);
 uint8_t bitcoin_add_unspent(uint8_t txid[], uint8_t vout, 
 	uint8_t script[], uint8_t script_length, uint64_t ammount,
 	uint8_t confirmations);
