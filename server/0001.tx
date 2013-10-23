@@ -1,0 +1,1 @@
+{"locktime": 0, "version": 1, "vin": [{"scriptPubKey": "76a914494fcf55ac4efb77d2098532512f428e259f634288ac", "vout": 1, "txid": "e8a4e5ae84061d5966dd79ecf7eca5114c10388381d88c0ea9cf6edb15dd7862"}], "vout": [{"value": "0.1000", "address": "9aa918c22aa7269ec6a2aaaa54b464a1ed8b20c3"}, {"value": "0.9146", "address": "494fcf55ac4efb77d2098532512f428e259f6342"}]}

@@ -1,0 +1,97 @@
+<html>
+<head>
+<title>Bitcoin Smart Card</title>
+<link rel="shortcut icon" type="image/x-icon" href="http://samfoley.com/static/favicon.ico">
+<meta name="viewport" content="width=475, user-scalable=false;">
+<style>
+body {
+	font-family: sans-serif;
+	font-size: 21px;
+	margin-top: 60px;
+}
+.error {
+	color: red
+}
+.tabs {
+	float:left;
+	width:100%;
+	padding:0;
+	margin:0px 0px 20px 0px;
+	list-style-type:none;
+}
+.selected {
+	border-bottom: 3px solid #333;
+}
+.logo {
+	margin-bottom: 20px
+}
+
+.tabs li {
+display: block;
+	float: left;
+	width: 130px;
+	background-color: #eee;	
+	padding: 10px;
+}
+input {
+	font-size: 25px;
+}
+strong {
+	color: #ff6600;
+}
+#history ul {
+	list-style: none;
+	padding-left: 0px;
+}
+.sendTX {
+	color: red;
+	list-style: none;
+	padding-left: 0px;
+	margin-left: 0px;
+}
+.receiveTX {
+	color: green;
+}
+</style>
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script>
+$(document).ready(function(){
+	update_status();
+});
+
+function update_status()
+{
+	$.get("/status?raw", function(data) {
+		if(data == "TX_READY")
+		{
+			window.location.href = "/confirm";
+		} else {
+			$('#status').text(data);
+			update_status();
+		}
+	});
+}
+</script>
+</head>
+<body>
+<img class="logo" src="http://samfoley.com/static/bitcoin-logo.png" width="459px" height="100px" /><br />
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+{% if error %}<div class="error">{{ error }}</div> {% endif %}
+<h2>Please hold card close to scanner</h2>
+Status: <pre id="status">waiting</pre>
+<form method="post" action="/cancel">
+	
+	<input type="submit" value="Cancel" />
+</form>
+</body>
+</html>

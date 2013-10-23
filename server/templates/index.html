@@ -1,0 +1,136 @@
+<html>
+<head>
+<title>Bitcoin Smart Card</title>
+<link rel="shortcut icon" type="image/x-icon" href="http://samfoley.com/static/favicon.ico">
+<meta name="viewport" content="width=475, user-scalable=false;">
+<style>
+body {
+	font-family: sans-serif;
+	font-size: 21px;
+	margin-top: 60px;
+}
+.error {
+	color: red
+}
+.tabs {
+	float:left;
+	width:100%;
+	padding:0;
+	margin:0px 0px 20px 0px;
+	list-style-type:none;
+}
+.selected {
+	border-bottom: 3px solid #333;
+}
+.logo {
+	margin-bottom: 20px
+}
+
+.tabs li {
+display: block;
+	float: left;
+	width: 130px;
+	background-color: #eee;	
+	padding: 10px;
+}
+input {
+	font-size: 25px;
+}
+strong {
+	color: #ff6600;
+}
+#history ul {
+	list-style: none;
+	padding-left: 0px;
+}
+.sendTX {
+	color: red;
+	list-style: none;
+	padding-left: 0px;
+	margin-left: 0px;
+}
+.receiveTX {
+	color: green;
+}
+</style>
+<script>
+function  showSend()
+{
+	document.getElementById('send').style.display = 'block';
+	document.getElementById('sendTab').className = 'selected';
+	document.getElementById('receive').style.display = 'none';
+	document.getElementById('receiveTab').className = '';
+	document.getElementById('history').style.display = 'none';
+	document.getElementById('historyTab').className = '';
+}
+function  showReceive()
+{
+	document.getElementById('send').style.display = 'none';
+	document.getElementById('sendTab').className = '';
+	document.getElementById('receive').style.display = 'block';
+	document.getElementById('receiveTab').className = 'selected';
+	document.getElementById('history').style.display = 'none';
+	document.getElementById('historyTab').className = '';
+}
+function  showHistory()
+{
+	document.getElementById('send').style.display = 'none';
+	document.getElementById('sendTab').className = '';
+	document.getElementById('receive').style.display = 'none';
+	document.getElementById('receiveTab').className = '';
+	document.getElementById('history').style.display = 'block';
+	document.getElementById('historyTab').className = 'selected';	
+}
+</script>
+</head>
+<body>
+<img class="logo" src="http://samfoley.com/static/bitcoin-logo.png" width="459px" height="100px" /><br />
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+{% if error %}<div class="error">{{ error }}</div> {% endif %}
+<p>Account balance: <strong>฿{{ balance }}BTC</strong></p>
+
+<ul class="tabs">
+	<li onclick="showSend()" id="sendTab" class="selected">Send</li>
+	<li onclick="showReceive()" id="receiveTab">Receive</li>
+	<li onclick="showHistory()" id="historyTab">History</li>
+</ul>
+
+
+
+<div id="send">
+<form method="post" action="/tx">
+	<input type="number" name="amount" step="0.01" value="{{ amount }}" /> Amount<br />
+	<input type="text" name="address" value="{{ address }}" /> Address<br />
+	<input type="submit" value="Send" />
+</form>
+</div>
+
+<div id="receive" style="display: none">
+<p>Deposit address: <strong>mnCbEM4pZY3E8DbG22faHRupmC39pGZZgC</strong></p>
+<img src="http://www.samfoley.com/static/qr.png" alt="" width="350" height="350" />
+</div>
+
+<div id="history" style="display: none">
+<ul>
+{%for tx in transactions %}
+	{% if tx['category'] == 'send' %}
+	<li class="sendTX">Sent ฿{{ tx['amount'] }} to {{ tx['address'] }} {% if tx['confirmations'] < 100 %}(Transaction {{ tx['confirmations'] }}% confirmed){% endif %}</li>
+	{% else %}
+	<li class="receiveTX">Received ฿{{ tx['amount'] }} {% if tx['confirmations'] < 100 %}(Transaction {{ tx['confirmations'] }}% confirmed){% endif %}</li>
+	{% endif %}
+{% endfor %}
+</ul>
+</div>
+
+</body>
+</html>
